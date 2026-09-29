@@ -7,7 +7,7 @@ import { CURRENT_USER } from '../data/people';
 
 interface PlanBubbleProps {
   plan: Plan;
-  onClick?: () => void;
+  onClick?: (e?: React.MouseEvent) => void;
   isJoined?: boolean;
   isMine?: boolean;
   isSelected?: boolean;
