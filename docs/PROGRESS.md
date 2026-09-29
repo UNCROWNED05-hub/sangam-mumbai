@@ -18,6 +18,16 @@
   - L9 Footer: 4 functional column links and giant clipped brand wordmark.
   - `/safety`, `/guidelines`, `/terms` policy pages with rich markdown-style cards.
   - Clean production build tested (`npm run build`).
+- [Phase 3] App Core (P0):
+  - Shell: Desktop navigation rail (Map, Plans, Chats, Trips, You, [+Post]) + Mobile bottom navigation bar + top filter & search bar + live counter badge + notifications popover.
+  - MapView: MapLibre GL with Carto Voyager (Day) / Dark Matter (Night), User radar dot with hollow ghost mode for invisible state, React Portals for custom interactive markers, popularity-based sizing, zoom-out area chips (<11.8) with animated fly-in, camera padding easing (desktop right 440px, mobile bottom 55%), glass controls (recenter, 2D/3D, day/night, zoom +/-).
+  - PlanList: Left floating panel on desktop, urgency chips ("Starts in Xm", "1 spot left", "Full: waitlist"), two-way rock-solid hover sync with map markers.
+  - PlanSheet: Right drawer (420px) / mobile bottom sheet with host card, verified shields, where/when with walking ETA, capacity progress meter, avatar stack with members modal, vibe tags, secondary actions (share, +1 friend, calendar, report modal).
+  - Hero Join Interaction: 450ms simulated latency with inline spinner, morph into lagoon check with ripple, 60-particle canvas-confetti burst, navigator.vibrate(12) haptics, undo toast with 5s countdown and open chat action.
+  - ChatRoom: Group chat per plan, header with pinned location/time strip, message bubbles, emoji reactions picker with counter pills, interactive poll voting with animated percentage bars, typing indicator with bouncing dots, scripted auto-replies (900-2200ms), auto-scroll with new messages pill.
+  - Composer: 5-step create plan flow (What's the plan, When, Where with map place mode crosshair, Who can join with capacity stepper, Review & Post). On post: camera flies, pin drops, toast confirms, plan marked as hosted.
+  - Keyboard shortcuts: '/' search, 'Esc' close, 'J'/'K' next/prev plan.
+  - Verified production build and live dev server.
 
 ## Decisions
 - Brand placeholder: "Sangam" centralized in `src/config/brand.ts`.

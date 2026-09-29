@@ -9,6 +9,18 @@ export type PlanCategory =
   | 'Wellness'
   | 'Trips';
 
+export const PLAN_CATEGORIES: PlanCategory[] = [
+  'Sports',
+  'Food and coffee',
+  'Outdoors',
+  'Creative',
+  'Games',
+  'Music',
+  'Study',
+  'Wellness',
+  'Trips',
+];
+
 export interface Plan {
   id: string;
   title: string;

@@ -1,24 +1,33 @@
 import React from 'react';
-import { Person } from '../data/people';
+import { Person, getPerson } from '../data/people';
 import { Avatar } from './Avatar';
 
 interface AvatarStackProps {
-  people: Person[];
+  people?: Person[];
+  userIds?: string[];
   limit?: number;
+  max?: number;
   totalGoing?: number;
-  size?: 'sm' | 'md';
+  size?: 'xs' | 'sm' | 'md';
   onTap?: () => void;
 }
 
 export const AvatarStack: React.FC<AvatarStackProps> = ({
   people,
-  limit = 4,
+  userIds,
+  limit,
+  max,
   totalGoing,
   size = 'md',
   onTap,
 }) => {
-  const visible = people.slice(0, limit);
-  const remaining = (totalGoing ?? people.length) - visible.length;
+  const resolvedPeople: Person[] =
+    people ||
+    (userIds ? userIds.map((id) => getPerson(id)) : []);
+
+  const actualLimit = max ?? limit ?? 4;
+  const visible = resolvedPeople.slice(0, actualLimit);
+  const remaining = (totalGoing ?? resolvedPeople.length) - visible.length;
 
   return (
     <div
@@ -32,7 +41,11 @@ export const AvatarStack: React.FC<AvatarStackProps> = ({
       {remaining > 0 && (
         <div
           className={`rounded-full bg-ink/10 dark:bg-white/10 text-ink dark:text-white font-bold flex items-center justify-center ring-2 ring-white dark:ring-night select-none ${
-            size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'
+            size === 'xs'
+              ? 'w-5 h-5 text-[9px]'
+              : size === 'sm'
+              ? 'w-6 h-6 text-[10px]'
+              : 'w-8 h-8 text-xs'
           }`}
         >
           +{remaining}

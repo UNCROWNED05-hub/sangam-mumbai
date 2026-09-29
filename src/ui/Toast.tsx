@@ -61,3 +61,5 @@ export const ToastContainer: React.FC = () => {
     </div>
   );
 };
+
+export { ToastContainer as Toast };

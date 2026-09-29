@@ -6,6 +6,7 @@ export interface Person {
   verified: boolean;
   interests: string[];
   plansHosted: number;
+  area?: string;
 }
 
 export const CURRENT_USER: Person = {
