@@ -14,6 +14,7 @@ import {
   MapPin,
   Play,
   Square,
+  Layers,
 } from 'lucide-react';
 
 interface MapViewProps {
@@ -41,6 +42,14 @@ const MUMBAI_LANDMARKS = [
   { name: 'Kala Ghoda', coords: [18.9289, 72.8318] as [number, number], zoom: 16 },
 ];
 
+// Free, 100% Open Tile Providers with ZERO API Key & ZERO Watermark
+const FREE_TILES = {
+  day: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  night: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+  esriStreet: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+  hot: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+};
+
 export const MapView: React.FC<MapViewProps> = ({
   filteredPlans,
   selectedPlanId,
@@ -59,15 +68,23 @@ export const MapView: React.FC<MapViewProps> = ({
 
   const { effectiveTheme, setTheme, isInvisible } = useAppStore();
   const [activeTourIndex, setActiveTourIndex] = useState<number | null>(null);
+  const [tileMode, setTileMode] = useState<'osm' | 'esri'>('osm');
   const tourTimerRef = useRef<number | null>(null);
 
   const isNight = effectiveTheme === 'dark';
+
+  // Determine active tile URL (100% Free, NO API KEY, NO WATERMARK)
+  const getActiveTileUrl = useCallback(() => {
+    if (isNight) {
+      return FREE_TILES.night;
+    }
+    return tileMode === 'osm' ? FREE_TILES.day : FREE_TILES.esriStreet;
+  }, [isNight, tileMode]);
 
   // 1. Initialize Leaflet Map
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    // Fix default marker icon issues if needed
     delete (L.Icon.Default.prototype as any)._getIconUrl;
 
     const map = L.map(mapContainerRef.current, {
@@ -81,14 +98,11 @@ export const MapView: React.FC<MapViewProps> = ({
 
     mapRef.current = map;
 
-    // Retina Carto Voyager Tiles (Day) or Dark Matter (Night)
-    const tileUrl = isNight
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-
-    const tileLayer = L.tileLayer(tileUrl, {
+    // Add Free OpenStreetMap / Esri tile layer
+    const initialTileUrl = isNight ? FREE_TILES.night : FREE_TILES.day;
+    const tileLayer = L.tileLayer(initialTileUrl, {
       maxZoom: 19,
-      subdomains: 'abcd',
+      attribution: '© OpenStreetMap contributors, © Esri',
     }).addTo(map);
 
     tileLayerRef.current = tileLayer;
@@ -97,13 +111,13 @@ export const MapView: React.FC<MapViewProps> = ({
     const markersLayer = L.layerGroup().addTo(map);
     markersLayerRef.current = markersLayer;
 
-    // Custom HTML Marker for User Location ("You are here")
+    // Custom HTML Marker for User Location ("You are here" Radar Dot)
     const userIcon = L.divIcon({
       className: 'user-location-marker',
       html: `
         <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
-          <div style="position: absolute; width: 26px; height: 26px; border-radius: 9999px; background: rgba(16, 185, 129, 0.35); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-          <div style="width: 14px; height: 14px; border-radius: 9999px; background: #10B981; border: 2.5px solid #FFFFFF; box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);"></div>
+          <div style="position: absolute; width: 26px; height: 26px; border-radius: 9999px; background: rgba(16, 185, 129, 0.4); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+          <div style="width: 14px; height: 14px; border-radius: 9999px; background: #10B981; border: 2.5px solid #FFFFFF; box-shadow: 0 0 10px rgba(16, 185, 129, 0.9);"></div>
         </div>
       `,
       iconSize: [28, 28],
@@ -113,7 +127,6 @@ export const MapView: React.FC<MapViewProps> = ({
     const userMarker = L.marker(USER_LOCATION, { icon: userIcon, interactive: false }).addTo(map);
     userMarkerRef.current = userMarker;
 
-    // Invalidate map size after DOM settles
     const timer = setTimeout(() => {
       map.invalidateSize();
     }, 200);
@@ -151,17 +164,12 @@ export const MapView: React.FC<MapViewProps> = ({
     };
   }, []);
 
-  // 2. Day / Night Tile Swap
+  // 2. Day / Night / Provider Tile Swap
   useEffect(() => {
-    if (!mapRef.current) return;
-    const tileUrl = isNight
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-
-    if (tileLayerRef.current) {
-      tileLayerRef.current.setUrl(tileUrl);
-    }
-  }, [isNight]);
+    if (!mapRef.current || !tileLayerRef.current) return;
+    const url = getActiveTileUrl();
+    tileLayerRef.current.setUrl(url);
+  }, [getActiveTileUrl]);
 
   // 3. Render Custom Markers for filteredPlans
   useEffect(() => {
@@ -375,7 +383,7 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      {/* Floating Controls (Recenter, Day/Night, Zoom) */}
+      {/* Floating Controls (Recenter, Day/Night, Provider Toggle, Zoom) */}
       <div className="absolute bottom-6 right-5 flex flex-col gap-2.5 z-30 select-none">
         <button
           onClick={handleRecenter}
@@ -393,6 +401,16 @@ export const MapView: React.FC<MapViewProps> = ({
           className="w-11 h-11 rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md text-gray-900 dark:text-white shadow-[3px_3px_0px_#000] border-2 border-black/80 dark:border-white/20 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
         >
           {isNight ? <Sun className="w-4 h-4 text-amber-400 stroke-[2.5]" /> : <Moon className="w-4 h-4 text-gray-700 stroke-[2.5]" />}
+        </button>
+
+        {/* Toggle between OpenStreetMap & Esri Streets */}
+        <button
+          onClick={() => setTileMode((prev) => (prev === 'osm' ? 'esri' : 'osm'))}
+          aria-label="Toggle Map Provider"
+          title={`Currently: ${tileMode === 'osm' ? 'OpenStreetMap' : 'Esri Streets'}. Tap to switch.`}
+          className="w-11 h-11 rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md text-gray-900 dark:text-white shadow-[3px_3px_0px_#000] border-2 border-black/80 dark:border-white/20 flex items-center justify-center hover:bg-amber-400 hover:text-black active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all cursor-pointer font-black text-[10px]"
+        >
+          <Layers className="w-4 h-4 stroke-[2.5]" />
         </button>
 
         <div className="flex flex-col rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md shadow-[3px_3px_0px_#000] border-2 border-black/80 dark:border-white/20 overflow-hidden">
@@ -416,7 +434,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
       {/* Map Attribution */}
       <div className="absolute bottom-2 left-4 text-[10px] text-gray-700 dark:text-gray-300 bg-white/85 dark:bg-black/85 backdrop-blur-xs px-2.5 py-1 rounded-md border border-black/10 shadow-xs pointer-events-none select-none z-10">
-        📍 Mumbai Metropolitan Region • © CARTO © OpenStreetMap
+        📍 Mumbai Metropolitan Region • © OpenStreetMap contributors • © Esri
       </div>
     </div>
   );

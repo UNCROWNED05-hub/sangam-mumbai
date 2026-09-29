@@ -101,10 +101,10 @@ export const L1Hero: React.FC<L1HeroProps> = () => {
 
     mapInstanceRef.current = map;
 
-    // Retina Carto Voyager Tiles
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    // Free OpenStreetMap Tiles (100% Free, NO API KEY, NO WATERMARK)
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      subdomains: 'abcd',
+      attribution: '© OpenStreetMap contributors',
     }).addTo(map);
 
     const timer = setTimeout(() => {
@@ -272,7 +272,7 @@ export const L1Hero: React.FC<L1HeroProps> = () => {
 
         {/* Map Attribution */}
         <div className="absolute bottom-3 right-4 text-[10px] text-gray-700 dark:text-gray-300 bg-white/85 dark:bg-black/85 backdrop-blur-xs px-2.5 py-1 rounded-md border border-black/10 shadow-xs pointer-events-none z-10">
-          📍 Mumbai Metropolitan Region • © CARTO © OpenStreetMap
+          📍 Mumbai Metropolitan Region • © OpenStreetMap contributors
         </div>
       </div>
 
