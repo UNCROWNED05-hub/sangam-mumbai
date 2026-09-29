@@ -7,6 +7,9 @@ import { Preloader } from '../systems/Preloader';
 import { L1Hero } from './sections/L1Hero';
 import { L2PhoneScene } from './sections/L2PhoneScene';
 import { L3ClockScene } from './sections/L3ClockScene';
+import { L4Bento } from './sections/L4Bento';
+import { L5AdBuilder } from './sections/L5AdBuilder';
+import { L6Stories } from './sections/L6Stories';
 import { L7FAQ } from './sections/L7FAQ';
 import { L8EmojiPile } from './sections/L8EmojiPile';
 import { L9Footer } from './sections/L9Footer';
@@ -52,6 +55,15 @@ export const Landing: React.FC = () => {
 
         {/* L3. Two Versions of Tonight: Sweeping clock dial, dual comparison, converging map */}
         <L3ClockScene />
+
+        {/* L4. Why it feels different: 6 interactive bento micro-demos */}
+        <L4Bento />
+
+        {/* L5. For Places: Interactive Ad builder with budget & radius slider */}
+        <L5AdBuilder />
+
+        {/* L6. Community Stories: Dual counter-scrolling marquees */}
+        <L6Stories />
 
         {/* L7. FAQ: Accordion with 5 original questions & answers */}
         <L7FAQ />

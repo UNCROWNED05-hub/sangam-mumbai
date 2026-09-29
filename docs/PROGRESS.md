@@ -35,6 +35,14 @@
   - ChatsTab: Joined Circles vs City Lounges (Mumbai Everyone, Bandra Locals, Weekend Hikers, Street Food), unread preview, and deep link into ChatRoom.
   - TripsTab: Crew trips showcase (Goa Workation, Lonavala Ridge Trail, Kanheri Caves), interactive day-by-day itinerary timeline, and interactive packing checklist with strikethrough animation.
   - YouTab: Profile presence, stats, Invisible Ghost Mode toggle, Club membership card, referral code with progress tracker, appearance theme selector (Auto/Day/Night), notification preferences, and demo reset.
+- [Phase 5] Landing P1/P2 Extras & Integrations:
+  - L4 Bento: Six interactive micro-demos (no feed wipe, real verified faces, public places, instant chat, invisible ghost mode toggle, free ticket).
+  - L5 AdBuilder: "For places" interactive reach simulator with budget & radius sliders, expanding StaticMap halo, odometer count-up, and link to `/partners`.
+  - L6 Stories: Dual counter-scrolling marquees with 14 community quotes, speed-responsive scrolling, and pause-on-hover.
+  - `/partners` Dashboard: Real-world partner portal with local footfall metrics, circle size metrics, and interactive campaign launcher.
+  - Command Palette: Global Ctrl/Cmd+K palette with search, tab shortcuts, quick actions (post plan, change theme, invisible mode).
+  - Easter Eggs: Konami code (`↑ ↑ ↓ ↓ ← → ← → B A`) emoji rain via canvas-confetti, wordmark interactions.
+  - Policy & Info Routes: `/safety`, `/guidelines`, `/terms` fully styled.
   - Clean production build tested (`npm run build`).
 
 ## Decisions
