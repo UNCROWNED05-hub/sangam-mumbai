@@ -1,0 +1,88 @@
+@import "lenis/dist/lenis.css";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sky-top: #CFE0FF;
+  --sky-bottom: #FFD6E0;
+  --ink: #14163A;
+  --ink-soft: rgba(20, 22, 58, 0.72);
+  --surface: #FFFFFF;
+  --line: rgba(20, 22, 58, 0.1);
+  --shadow-tint: rgba(20, 22, 58, 0.08);
+}
+
+[data-theme="dark"] {
+  --ink: #F3F1FF;
+  --ink-soft: rgba(243, 241, 255, 0.72);
+  --surface: #1D2050;
+  --line: rgba(255, 255, 255, 0.12);
+  --shadow-tint: rgba(0, 0, 0, 0.35);
+}
+
+html, body {
+  font-family: "Bricolage Grotesque", system-ui, sans-serif;
+  color: var(--ink);
+  transition: color 200ms ease;
+  overflow-x: hidden;
+}
+
+/* Custom cursor management */
+html.has-cursor,
+html.has-cursor * {
+  cursor: none !important;
+}
+
+/* Restore native cursor inside text inputs */
+html.has-cursor input,
+html.has-cursor textarea,
+html.has-cursor select,
+html.has-cursor [contenteditable="true"] {
+  cursor: text !important;
+}
+
+/* Accessible focus ring */
+:focus-visible {
+  outline: 2px solid #10B5A5 !important;
+  outline-offset: 2px !important;
+}
+
+/* Tabular figures for numbers */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Balanced headlines */
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(20, 22, 58, 0.2);
+  border-radius: 9999px;
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Grain overlay */
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9990;
+  opacity: 0.045;
+}
