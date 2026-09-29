@@ -109,12 +109,12 @@ export const StaticMap: React.FC<StaticMapProps> = ({
           style={{ left: `${(pin.x / 600) * 100}%`, top: `${(pin.y / 450) * 100}%` }}
         >
           <div
-            className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold shadow-md ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black shadow-[2px_2px_0px_#000] border-2 border-black ${
               pin.isSponsored
-                ? 'bg-ink text-white border-2 border-marigold'
+                ? 'bg-black text-amber-400 border-amber-400'
                 : pin.isJoined
-                ? 'bg-lagoon text-white'
-                : 'bg-white text-ink border border-ink/10'
+                ? 'bg-emerald-500 text-white'
+                : 'bg-white text-black'
             }`}
           >
             {pin.emoji && <span className="font-emoji text-sm">{pin.emoji}</span>}

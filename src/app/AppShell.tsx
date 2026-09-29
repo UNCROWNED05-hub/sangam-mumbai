@@ -174,18 +174,18 @@ export const AppShell: React.FC<AppShellProps> = ({ onSwitchToStory }) => {
       {/* 1. LEFT NAVIGATION RAIL (Desktop lg:flex, 84px) */}
       <nav
         aria-label="Sidebar Navigation"
-        className="hidden lg:flex flex-col items-center justify-between w-[84px] h-full py-6 bg-paper/95 dark:bg-night/95 backdrop-blur-md border-r border-black/10 dark:border-white/10 z-30 select-none"
+        className="hidden lg:flex flex-col items-center justify-between w-[84px] h-full py-6 bg-[#FFFDF7]/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-r-2 border-black/10 dark:border-white/10 z-30 select-none"
       >
         {/* Logo */}
         <div className="flex flex-col items-center gap-1">
           <button
             onClick={() => (onSwitchToStory ? onSwitchToStory() : navigate('/'))}
             title="Return to Home Landing"
-            className="w-11 h-11 rounded-2xl bg-marigold flex items-center justify-center text-ink font-display font-extrabold text-xl shadow-soft hover:scale-105 active:scale-95 transition-all"
+            className="w-11 h-11 rounded-2xl bg-amber-400 border-2 border-black flex items-center justify-center text-black font-display font-black text-xl shadow-[3px_3px_0px_#000] hover:scale-105 active:scale-95 transition-all cursor-pointer"
           >
             S
           </button>
-          <span className="text-[10px] font-black uppercase tracking-wider text-ink-muted">
+          <span className="text-[10px] font-mono font-black uppercase tracking-wider text-gray-500">
             {BRAND.name.toLowerCase()}
           </span>
         </div>
@@ -210,21 +210,21 @@ export const AppShell: React.FC<AppShellProps> = ({ onSwitchToStory }) => {
                     openChatForPlan(null);
                   }
                 }}
-                className={`relative w-full py-2.5 rounded-2xl flex flex-col items-center gap-1 transition-all ${
+                className={`relative w-full py-2.5 rounded-2xl flex flex-col items-center gap-1 transition-all cursor-pointer ${
                   isActive
-                    ? 'text-ink dark:text-white font-bold'
-                    : 'text-ink-soft dark:text-ink-muted hover:text-ink dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
+                    ? 'text-black dark:text-white font-black'
+                    : 'text-gray-500 hover:text-black dark:hover:text-white hover:bg-black/5'
                 }`}
               >
                 {isActive && (
                   <motion.div
                     layoutId="railActiveIndicator"
-                    className="absolute inset-0 bg-marigold/15 dark:bg-marigold/20 rounded-2xl border border-marigold/30"
+                    className="absolute inset-0 bg-amber-400/20 rounded-2xl border-2 border-amber-400 shadow-[2px_2px_0px_#000]"
                     transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                   />
                 )}
-                <Icon className={`w-5 h-5 relative z-10 ${isActive ? 'text-marigold' : ''}`} />
-                <span className="text-[10px] font-bold tracking-tight relative z-10">
+                <Icon className={`w-5 h-5 relative z-10 stroke-[2.5] ${isActive ? 'text-amber-500' : ''}`} />
+                <span className="text-[10px] font-black tracking-tight relative z-10">
                   {tab.label}
                 </span>
               </button>
@@ -237,11 +237,11 @@ export const AppShell: React.FC<AppShellProps> = ({ onSwitchToStory }) => {
           <button
             onClick={() => setComposerOpen(true)}
             title="Post a new plan"
-            className="w-12 h-12 rounded-full bg-marigold text-ink shadow-soft hover:brightness-105 active:scale-95 transition-all flex items-center justify-center font-black"
+            className="w-12 h-12 rounded-2xl bg-amber-400 border-2 border-black text-black shadow-[3px_3px_0px_#000] hover:brightness-105 active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all flex items-center justify-center font-black cursor-pointer"
           >
             <Plus className="w-6 h-6 stroke-[3]" />
           </button>
-          <span className="text-[9px] font-bold text-ink-muted">Post</span>
+          <span className="text-[10px] font-mono font-black text-gray-500 uppercase">Host</span>
         </div>
       </nav>
 
@@ -251,20 +251,20 @@ export const AppShell: React.FC<AppShellProps> = ({ onSwitchToStory }) => {
         <header className="absolute top-0 inset-x-0 z-20 p-3 sm:p-4 pointer-events-none flex flex-col gap-2.5">
           <div className="flex items-center justify-between gap-2.5 max-w-7xl mx-auto w-full">
             {/* Search Input Bar */}
-            <div className="pointer-events-auto flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-paper/90 dark:bg-night/90 backdrop-blur-md border border-black/10 dark:border-white/10 shadow-soft w-full max-w-sm sm:max-w-md focus-within:border-marigold transition-all">
-              <Search className="w-4 h-4 text-ink-muted flex-shrink-0" />
+            <div className="pointer-events-auto flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-2 border-black/80 dark:border-white/20 shadow-[3px_3px_0px_#000] w-full max-w-sm sm:max-w-md focus-within:border-amber-400 transition-all">
+              <Search className="w-4 h-4 text-gray-500 flex-shrink-0 stroke-[2.5]" />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search plans, cafes, areas... (Press /)"
-                className="w-full bg-transparent text-xs sm:text-sm text-ink dark:text-white placeholder:text-ink-muted focus:outline-hidden"
+                placeholder="Search Bandra, Marine Drive, chai, courts... (/)"
+                className="w-full bg-transparent text-xs sm:text-sm text-gray-900 dark:text-white placeholder:text-gray-500 focus:outline-hidden font-medium"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="w-4 h-4 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center text-ink-muted hover:text-ink"
+                  className="w-4 h-4 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center text-gray-500 hover:text-black"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -274,28 +274,28 @@ export const AppShell: React.FC<AppShellProps> = ({ onSwitchToStory }) => {
             {/* Right badges & controls */}
             <div className="pointer-events-auto flex items-center gap-2 flex-shrink-0">
               {/* Live Count Pill */}
-              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-paper/90 dark:bg-night/90 backdrop-blur-md border border-black/10 dark:border-white/10 shadow-soft text-xs font-bold text-ink dark:text-white">
-                <span className="w-2 h-2 rounded-full bg-lagoon animate-pulse" />
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-2 border-black/80 dark:border-white/20 shadow-[2px_2px_0px_#000] text-xs font-black text-gray-900 dark:text-white">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>{livePeopleOutCount.toLocaleString()} out</span>
               </div>
 
               {/* Mobile View Toggle (Map / List) */}
               <button
                 onClick={() => setMobileViewMode(mobileViewMode === 'map' ? 'list' : 'map')}
-                className="lg:hidden px-3 py-2 rounded-full bg-paper/90 dark:bg-night/90 backdrop-blur-md border border-black/10 dark:border-white/10 shadow-soft text-xs font-bold text-ink dark:text-white flex items-center gap-1"
+                className="lg:hidden px-3 py-1.5 rounded-xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-2 border-black/80 dark:border-white/20 shadow-[2px_2px_0px_#000] text-xs font-black text-gray-900 dark:text-white flex items-center gap-1"
               >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-marigold" />
+                <SlidersHorizontal className="w-3.5 h-3.5 text-amber-500" />
                 <span>{mobileViewMode === 'map' ? 'List' : 'Map'}</span>
               </button>
 
               {/* Notification Bell */}
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="relative w-10 h-10 rounded-full bg-paper/90 dark:bg-night/90 backdrop-blur-md border border-black/10 dark:border-white/10 shadow-soft flex items-center justify-center text-ink dark:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                className="relative w-10 h-10 rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-2 border-black/80 dark:border-white/20 shadow-[2px_2px_0px_#000] flex items-center justify-center text-gray-900 dark:text-white hover:bg-amber-400 hover:text-black transition-colors cursor-pointer"
               >
-                <Bell className="w-4 h-4" />
+                <Bell className="w-4 h-4 stroke-[2.5]" />
                 {unreadNotificationCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-bougainvillea" />
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-rose-500" />
                 )}
               </button>
             </div>
@@ -309,26 +309,26 @@ export const AppShell: React.FC<AppShellProps> = ({ onSwitchToStory }) => {
             {/* "All" Chip */}
             <button
               onClick={() => setFilter('All')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1.5 shadow-xs ${
+              className={`px-3 py-1 rounded-xl text-xs font-black whitespace-nowrap transition-all border-2 flex items-center gap-1.5 cursor-pointer ${
                 activeFilter === 'All'
-                  ? 'bg-ink text-white dark:bg-marigold dark:text-ink border-transparent shadow-soft'
-                  : 'bg-paper/90 dark:bg-night/90 backdrop-blur-md border-black/10 dark:border-white/10 text-ink dark:text-white hover:bg-black/5'
+                  ? 'bg-amber-400 text-black border-black shadow-[2px_2px_0px_#000]'
+                  : 'bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-black/60 dark:border-white/20 text-gray-800 dark:text-gray-200 hover:bg-black/5 shadow-xs'
               }`}
             >
               <span>All Plans</span>
-              <span className="text-[10px] font-black opacity-80">({plans.length})</span>
+              <span className="text-[10px] font-mono opacity-80">({plans.length})</span>
             </button>
 
             {/* Starting Soon Toggle Chip */}
             <button
               onClick={() => setOnlyStartingSoon(!onlyStartingSoon)}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1.5 shadow-xs ${
+              className={`px-3 py-1 rounded-xl text-xs font-black whitespace-nowrap transition-all border-2 flex items-center gap-1.5 cursor-pointer ${
                 onlyStartingSoon
-                  ? 'bg-bougainvillea text-white border-transparent shadow-soft'
-                  : 'bg-paper/90 dark:bg-night/90 backdrop-blur-md border-black/10 dark:border-white/10 text-ink dark:text-white hover:bg-black/5'
+                  ? 'bg-rose-500 text-white border-black shadow-[2px_2px_0px_#000]'
+                  : 'bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-black/60 dark:border-white/20 text-gray-800 dark:text-gray-200 hover:bg-black/5 shadow-xs'
               }`}
             >
-              <Flame className="w-3.5 h-3.5 text-marigold" />
+              <Flame className="w-3.5 h-3.5 text-amber-400 fill-current" />
               <span>Starting Soon</span>
             </button>
 
@@ -340,14 +340,14 @@ export const AppShell: React.FC<AppShellProps> = ({ onSwitchToStory }) => {
                 <button
                   key={cat}
                   onClick={() => setFilter(cat)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1.5 shadow-xs ${
+                  className={`px-3 py-1 rounded-xl text-xs font-black whitespace-nowrap transition-all border-2 flex items-center gap-1.5 cursor-pointer ${
                     isSelected
-                      ? 'bg-ink text-white dark:bg-marigold dark:text-ink border-transparent shadow-soft'
-                      : 'bg-paper/90 dark:bg-night/90 backdrop-blur-md border-black/10 dark:border-white/10 text-ink dark:text-white hover:bg-black/5'
+                      ? 'bg-amber-400 text-black border-black shadow-[2px_2px_0px_#000]'
+                      : 'bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-black/60 dark:border-white/20 text-gray-800 dark:text-gray-200 hover:bg-black/5 shadow-xs'
                   }`}
                 >
                   <span>{cat}</span>
-                  <span className="text-[10px] font-black opacity-80">({count})</span>
+                  <span className="text-[10px] font-mono opacity-80">({count})</span>
                 </button>
               );
             })}

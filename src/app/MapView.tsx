@@ -6,9 +6,9 @@ import { Plan } from '../data/plans';
 import { CITY } from '../config/city';
 import { useAppStore } from '../store/useAppStore';
 import { PlanBubble } from '../ui/PlanBubble';
+import { MAP_STYLE_DAY, MAP_STYLE_NIGHT, MUMBAI_WAYPOINTS } from '../config/mapStyles';
 import {
   Compass,
-  Layers,
   Moon,
   Sun,
   Plus,
@@ -17,6 +17,9 @@ import {
   EyeOff,
   Crosshair,
   MapPin,
+  Play,
+  Square,
+  Sparkles,
 } from 'lucide-react';
 
 interface MapViewProps {
@@ -30,10 +33,7 @@ interface MapViewProps {
   className?: string;
 }
 
-const CARTO_VOYAGER = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
-const CARTO_DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-
-// User fake location: Bandra West
+// User starting location: Bandra West, Mumbai
 const USER_LOCATION: [number, number] = [72.83, 19.059];
 
 export const MapView: React.FC<MapViewProps> = ({
@@ -54,92 +54,98 @@ export const MapView: React.FC<MapViewProps> = ({
   const [currentZoom, setCurrentZoom] = useState(12.6);
   const [is3D, setIs3D] = useState(true);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [markerContainers, setMarkerContainers] = useState<Map<string, { el: HTMLDivElement; marker: maplibregl.Marker }>>(
-    new Map()
-  );
+  const [activeTourIndex, setActiveTourIndex] = useState<number | null>(null);
+  const tourTimerRef = useRef<number | null>(null);
+
+  const [markerContainers, setMarkerContainers] = useState<
+    Map<string, { el: HTMLDivElement; marker: maplibregl.Marker }>
+  >(new Map());
 
   const isNight = effectiveTheme === 'dark';
-  const isZoomedOut = currentZoom < 11.8;
+  const isZoomedOut = currentZoom < 11.5;
 
-  // 1. Initialize Map
+  // 1. Initialize Map with Carto Retina Raster specification
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: isNight ? CARTO_DARK : CARTO_VOYAGER,
-      center: USER_LOCATION,
-      zoom: 12.6,
-      pitch: 50,
-      bearing: -12,
-      attributionControl: false,
-      maxPitch: 65,
-    });
+    try {
+      const map = new maplibregl.Map({
+        container: mapContainerRef.current,
+        style: isNight ? MAP_STYLE_NIGHT : MAP_STYLE_DAY,
+        center: USER_LOCATION,
+        zoom: 12.8,
+        pitch: 52,
+        bearing: -14,
+        attributionControl: false,
+        maxPitch: 65,
+      });
 
-    map.on('load', () => {
-      setIsMapLoaded(true);
-      // Attempt 3D building fill-extrusion if layer exists
-      try {
-        if (map.getSource('carto-vector') || map.getSource('composite')) {
-          // Subtle styling
-        }
-      } catch {
-        // Silently skip
-      }
-    });
+      map.on('load', () => {
+        setIsMapLoaded(true);
+        map.resize();
+      });
 
-    map.on('zoom', () => {
-      setCurrentZoom(map.getZoom());
-    });
+      map.on('zoom', () => {
+        setCurrentZoom(map.getZoom());
+      });
 
-    // Handle placeMode drag tracking
-    map.on('move', () => {
-      if (placeMode && onPlaceLocationChange) {
-        const center = map.getCenter();
-        const lngLat: [number, number] = [center.lng, center.lat];
-        // Find nearest anchor
-        let nearest = CITY.anchors[0];
-        let minDist = Infinity;
-        for (const anchor of CITY.anchors) {
-          const dx = anchor.lngLat[0] - lngLat[0];
-          const dy = anchor.lngLat[1] - lngLat[1];
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < minDist) {
-            minDist = dist;
-            nearest = anchor;
+      // Handle placeMode drag tracking
+      map.on('move', () => {
+        if (placeMode && onPlaceLocationChange) {
+          const center = map.getCenter();
+          const lngLat: [number, number] = [center.lng, center.lat];
+          // Find nearest anchor
+          let nearest = CITY.anchors[0];
+          let minDist = Infinity;
+          for (const anchor of CITY.anchors) {
+            const dx = anchor.lngLat[0] - lngLat[0];
+            const dy = anchor.lngLat[1] - lngLat[1];
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < minDist) {
+              minDist = dist;
+              nearest = anchor;
+            }
           }
+          onPlaceLocationChange(lngLat, `Near ${nearest.name}`);
         }
-        onPlaceLocationChange(lngLat, `Near ${nearest.name}`);
-      }
-    });
+      });
 
-    mapRef.current = map;
+      mapRef.current = map;
 
-    // Attach User Location Marker
-    const userEl = document.createElement('div');
-    userEl.className = 'user-radar-marker relative pointer-events-none';
-    const userMarker = new maplibregl.Marker({ element: userEl })
-      .setLngLat(USER_LOCATION)
-      .addTo(map);
-    userMarkerRef.current = userMarker;
+      // Attach User Location Marker
+      const userEl = document.createElement('div');
+      userEl.className = 'user-radar-marker relative pointer-events-none';
+      const userMarker = new maplibregl.Marker({ element: userEl })
+        .setLngLat(USER_LOCATION)
+        .addTo(map);
+      userMarkerRef.current = userMarker;
 
-    const resizeObserver = new ResizeObserver(() => {
-      map.resize();
-    });
-    resizeObserver.observe(mapContainerRef.current);
+      const handleWindowResize = () => {
+        map.resize();
+      };
+      window.addEventListener('resize', handleWindowResize);
 
-    return () => {
-      resizeObserver.disconnect();
-      userMarker.remove();
-      map.remove();
-      mapRef.current = null;
-    };
+      const resizeObserver = new ResizeObserver(() => {
+        map.resize();
+      });
+      resizeObserver.observe(mapContainerRef.current);
+
+      return () => {
+        window.removeEventListener('resize', handleWindowResize);
+        resizeObserver.disconnect();
+        userMarker.remove();
+        map.remove();
+        mapRef.current = null;
+      };
+    } catch (err) {
+      console.error('Failed to init MapLibre:', err);
+    }
   }, []);
 
   // 2. Handle Day / Night style changes
   useEffect(() => {
     if (!mapRef.current || !isMapLoaded) return;
-    const targetStyle = isNight ? CARTO_DARK : CARTO_VOYAGER;
+    const targetStyle = isNight ? MAP_STYLE_NIGHT : MAP_STYLE_DAY;
     mapRef.current.setStyle(targetStyle);
   }, [isNight, isMapLoaded]);
 
@@ -182,7 +188,6 @@ export const MapView: React.FC<MapViewProps> = ({
 
         nextContainers.set(plan.id, { el, marker });
       } else {
-        // Update position if needed
         const existing = nextContainers.get(plan.id);
         existing?.marker.setLngLat(plan.place.lngLat);
       }
@@ -191,7 +196,7 @@ export const MapView: React.FC<MapViewProps> = ({
     setMarkerContainers(nextContainers);
   }, [filteredPlans, isMapLoaded, isZoomedOut, placeMode]);
 
-  // 4. Camera Padding when Plan Selected
+  // 4. Camera Glide when Plan Selected
   useEffect(() => {
     if (!mapRef.current || !selectedPlanId) return;
     const targetPlan = filteredPlans.find((p) => p.id === selectedPlanId);
@@ -205,8 +210,8 @@ export const MapView: React.FC<MapViewProps> = ({
     mapRef.current.easeTo({
       center: targetPlan.place.lngLat,
       padding,
-      zoom: Math.max(mapRef.current.getZoom(), 13.5),
-      duration: 650,
+      zoom: Math.max(mapRef.current.getZoom(), 13.8),
+      duration: 750,
       essential: true,
     });
   }, [selectedPlanId, filteredPlans]);
@@ -214,12 +219,13 @@ export const MapView: React.FC<MapViewProps> = ({
   // Map Controls
   const handleRecenter = useCallback(() => {
     if (!mapRef.current) return;
+    stopTour();
     mapRef.current.flyTo({
       center: USER_LOCATION,
-      zoom: 13,
-      pitch: is3D ? 50 : 0,
-      bearing: -12,
-      duration: 1000,
+      zoom: 13.2,
+      pitch: is3D ? 52 : 0,
+      bearing: -14,
+      duration: 1200,
     });
   }, [is3D]);
 
@@ -228,7 +234,7 @@ export const MapView: React.FC<MapViewProps> = ({
     const next3D = !is3D;
     setIs3D(next3D);
     mapRef.current.easeTo({
-      pitch: next3D ? 50 : 0,
+      pitch: next3D ? 52 : 0,
       duration: 500,
     });
   }, [is3D]);
@@ -247,7 +253,54 @@ export const MapView: React.FC<MapViewProps> = ({
     mapRef.current.zoomOut({ duration: 300 });
   }, []);
 
-  // Compute Area Clusters when zoomed out (<11.8)
+  // Quick Fly to Mumbai Landmark
+  const handleFlyToLandmark = (lngLat: [number, number], zoom = 14.5, pitch = 55, bearing = -15) => {
+    if (!mapRef.current) return;
+    stopTour();
+    mapRef.current.flyTo({
+      center: lngLat,
+      zoom,
+      pitch: is3D ? pitch : 0,
+      bearing,
+      duration: 1400,
+      essential: true,
+    });
+  };
+
+  // Cinematic Mumbai Autoplay Tour
+  const startTour = () => {
+    if (!mapRef.current) return;
+    let step = 0;
+    setActiveTourIndex(0);
+
+    const runStep = () => {
+      if (!mapRef.current) return;
+      const wp = MUMBAI_WAYPOINTS[step];
+      mapRef.current.flyTo({
+        center: wp.center,
+        zoom: wp.zoom,
+        pitch: is3D ? wp.pitch : 0,
+        bearing: wp.bearing,
+        duration: 3200,
+      });
+
+      step = (step + 1) % MUMBAI_WAYPOINTS.length;
+      setActiveTourIndex(step);
+      tourTimerRef.current = window.setTimeout(runStep, 4500);
+    };
+
+    runStep();
+  };
+
+  const stopTour = () => {
+    if (tourTimerRef.current !== null) {
+      window.clearTimeout(tourTimerRef.current);
+      tourTimerRef.current = null;
+    }
+    setActiveTourIndex(null);
+  };
+
+  // Compute Area Clusters when zoomed out (<11.5)
   const areaClusters = useMemo(() => {
     if (!isZoomedOut) return [];
     const clusters: { name: string; lngLat: [number, number]; count: number }[] = [];
@@ -271,24 +324,65 @@ export const MapView: React.FC<MapViewProps> = ({
     return clusters;
   }, [isZoomedOut, filteredPlans]);
 
-  const handleFlyToArea = (lngLat: [number, number]) => {
-    if (!mapRef.current) return;
-    mapRef.current.flyTo({
-      center: lngLat,
-      zoom: 13.8,
-      duration: 1100,
-    });
-  };
-
   return (
-    <div className={`relative w-full h-full overflow-hidden ${className}`}>
-      {/* MapLibre WebGL container */}
+    <div className={`relative w-full h-full overflow-hidden bg-[#E8ECEF] ${className}`}>
+      {/* MapLibre Canvas */}
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
       {/* Subtle Map gradient vignette at edges */}
-      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_80px_rgba(20,22,58,0.12)] dark:shadow-[inset_0_0_100px_rgba(0,0,0,0.5)]" />
+      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_80px_rgba(20,22,58,0.1)] dark:shadow-[inset_0_0_100px_rgba(0,0,0,0.5)]" />
 
-      {/* Render React Portal Portals into Marker Containers */}
+      {/* Top Mumbai Landmark Quick-Flight Bar */}
+      <div className="absolute top-28 sm:top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-2 border-black/80 dark:border-white/20 shadow-[3px_3px_0px_#000] max-w-[94vw] overflow-x-auto select-none">
+        <div className="flex items-center gap-1 px-2 text-[10px] font-black text-amber-500 uppercase tracking-wider font-mono flex-shrink-0">
+          <MapPin className="w-3.5 h-3.5 text-rose-500 animate-bounce" />
+          <span>MUMBAI:</span>
+        </div>
+
+        {[
+          { name: 'Marine Drive', coords: [72.8236, 18.9433] as [number, number] },
+          { name: 'Bandra Bandstand', coords: [72.8190, 19.0425] as [number, number] },
+          { name: 'Gateway of India', coords: [72.8340, 18.9226] as [number, number] },
+          { name: 'Worli Sea Face', coords: [72.8165, 19.0100] as [number, number] },
+          { name: 'Juhu Beach', coords: [72.8266, 19.0985] as [number, number] },
+          { name: 'Shivaji Park', coords: [72.8380, 19.0270] as [number, number] },
+        ].map((loc) => (
+          <button
+            key={loc.name}
+            type="button"
+            onClick={() => handleFlyToLandmark(loc.coords)}
+            data-cursor="fly"
+            className="px-2.5 py-1 rounded-xl text-xs font-bold text-gray-900 dark:text-white hover:bg-amber-400 hover:text-black transition-all whitespace-nowrap cursor-pointer"
+          >
+            {loc.name}
+          </button>
+        ))}
+
+        {/* Cinematic Tour Toggle */}
+        <button
+          type="button"
+          onClick={activeTourIndex !== null ? stopTour : startTour}
+          className={`px-3 py-1 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer flex-shrink-0 ${
+            activeTourIndex !== null
+              ? 'bg-rose-500 text-white animate-pulse'
+              : 'bg-black text-white dark:bg-white dark:text-black hover:bg-amber-400 hover:text-black'
+          }`}
+        >
+          {activeTourIndex !== null ? (
+            <>
+              <Square className="w-3 h-3 fill-current" />
+              <span>Stop Tour</span>
+            </>
+          ) : (
+            <>
+              <Play className="w-3 h-3 fill-current" />
+              <span>Tour Mumbai</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Render React Portals into Marker Containers */}
       {!isZoomedOut &&
         !placeMode &&
         Array.from(markerContainers.entries()).map(([id, { el }]) => {
@@ -322,7 +416,7 @@ export const MapView: React.FC<MapViewProps> = ({
           );
         })}
 
-      {/* Zoom-out Area Chips (<11.8) */}
+      {/* Zoom-out Area Chips (<11.5) */}
       <AnimatePresence>
         {isZoomedOut && !placeMode && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
@@ -337,12 +431,12 @@ export const MapView: React.FC<MapViewProps> = ({
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.6, opacity: 0 }}
                     transition={{ type: 'spring', damping: 20 }}
-                    onClick={() => handleFlyToArea(cluster.lngLat)}
-                    className="absolute pointer-events-auto transform -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-full bg-ink/90 dark:bg-night/90 text-white border border-marigold/60 shadow-lg hover:scale-105 hover:bg-marigold hover:text-ink transition-all flex items-center gap-1.5 backdrop-blur-md cursor-pointer"
+                    onClick={() => handleFlyToLandmark(cluster.lngLat, 13.8)}
+                    className="absolute pointer-events-auto transform -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-2xl bg-black text-white dark:bg-white dark:text-black border-2 border-amber-400 shadow-[3px_3px_0px_#000] hover:scale-105 hover:bg-amber-400 hover:text-black transition-all flex items-center gap-1.5 backdrop-blur-md cursor-pointer"
                     style={{ left: point.x, top: point.y }}
                   >
-                    <span className="font-bold text-xs">{cluster.name}</span>
-                    <span className="text-[10px] bg-marigold text-ink px-1.5 py-0.5 rounded-full font-black">
+                    <span className="font-black text-xs">{cluster.name}</span>
+                    <span className="text-[10px] bg-amber-400 text-black px-1.5 py-0.5 rounded-full font-black">
                       {cluster.count}
                     </span>
                   </motion.button>
@@ -358,17 +452,15 @@ export const MapView: React.FC<MapViewProps> = ({
         createPortal(
           <div className="relative flex items-center justify-center">
             {isInvisible ? (
-              <div className="relative p-2 rounded-full bg-ink/70 dark:bg-night/80 border border-white/40 shadow-soft backdrop-blur-xs flex items-center gap-1.5">
-                <EyeOff className="w-4 h-4 text-marigold" />
+              <div className="relative p-2 rounded-full bg-black/80 dark:bg-white/80 border border-white/40 shadow-soft backdrop-blur-xs flex items-center gap-1.5">
+                <EyeOff className="w-4 h-4 text-amber-400" />
                 <span className="text-[10px] font-bold text-white pr-1">Invisible</span>
               </div>
             ) : (
               <>
-                {/* Ripple rings */}
-                <span className="absolute w-8 h-8 rounded-full bg-lagoon/30 animate-ping opacity-75" />
-                <span className="absolute w-6 h-6 rounded-full bg-lagoon/40 animate-pulse" />
-                {/* Core dot */}
-                <div className="relative w-4 h-4 rounded-full bg-lagoon border-2 border-white shadow-md flex items-center justify-center">
+                <span className="absolute w-8 h-8 rounded-full bg-emerald-500/30 animate-ping opacity-75" />
+                <span className="absolute w-6 h-6 rounded-full bg-emerald-500/40 animate-pulse" />
+                <div className="relative w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-md flex items-center justify-center">
                   <div className="w-1.5 h-1.5 rounded-full bg-white" />
                 </div>
               </>
@@ -385,36 +477,36 @@ export const MapView: React.FC<MapViewProps> = ({
             animate={{ scale: 1, opacity: 1 }}
             className="flex flex-col items-center"
           >
-            <div className="w-12 h-12 rounded-full border-2 border-dashed border-marigold flex items-center justify-center animate-spin-slow">
-              <Crosshair className="w-6 h-6 text-marigold" />
+            <div className="w-12 h-12 rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center animate-spin-slow">
+              <Crosshair className="w-6 h-6 text-amber-400" />
             </div>
-            <div className="mt-2 px-3 py-1 bg-ink text-white text-xs font-bold rounded-full shadow-lg border border-marigold flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-marigold animate-bounce" />
-              <span>Drag map to place pin</span>
+            <div className="mt-2 px-3 py-1 bg-black text-white text-xs font-bold rounded-full shadow-lg border-2 border-amber-400 flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-amber-400 animate-bounce" />
+              <span>Drag map to place Mumbai pin</span>
             </div>
           </motion.div>
         </div>
       )}
 
-      {/* Floating Glass Controls (Recenter, 2D/3D, Day/Night, Zoom) */}
+      {/* Floating Controls (Recenter, 2D/3D, Day/Night, Zoom) */}
       <div className="absolute bottom-6 right-5 flex flex-col gap-2.5 z-30 select-none">
         <button
           onClick={handleRecenter}
           aria-label="Recenter map"
-          title="Recenter to your location"
-          className="w-10 h-10 rounded-full bg-white/85 dark:bg-night/85 backdrop-blur-md text-ink dark:text-white shadow-soft border border-black/5 dark:border-white/10 flex items-center justify-center hover:bg-marigold hover:text-ink active:scale-95 transition-all"
+          title="Recenter to your Mumbai location"
+          className="w-11 h-11 rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md text-gray-900 dark:text-white shadow-[3px_3px_0px_#000] border-2 border-black/80 dark:border-white/20 flex items-center justify-center hover:bg-amber-400 hover:text-black active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
         >
-          <Navigation className="w-4 h-4" />
+          <Navigation className="w-4 h-4 stroke-[2.5]" />
         </button>
 
         <button
           onClick={handleToggle3D}
           aria-label="Toggle 3D map pitch"
           title={is3D ? 'Switch to 2D' : 'Switch to 3D'}
-          className={`w-10 h-10 rounded-full backdrop-blur-md shadow-soft border border-black/5 dark:border-white/10 flex items-center justify-center active:scale-95 transition-all ${
+          className={`w-11 h-11 rounded-2xl backdrop-blur-md shadow-[3px_3px_0px_#000] border-2 border-black/80 dark:border-white/20 flex items-center justify-center active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all cursor-pointer font-black text-xs ${
             is3D
-              ? 'bg-marigold text-ink font-bold text-xs'
-              : 'bg-white/85 dark:bg-night/85 text-ink dark:text-white text-xs font-bold hover:bg-black/5 dark:hover:bg-white/10'
+              ? 'bg-amber-400 text-black'
+              : 'bg-white/95 dark:bg-[#0F111A]/95 text-gray-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/10'
           }`}
         >
           {is3D ? '3D' : '2D'}
@@ -424,33 +516,33 @@ export const MapView: React.FC<MapViewProps> = ({
           onClick={handleToggleTheme}
           aria-label="Toggle Day / Night map"
           title={isNight ? 'Switch to Day style' : 'Switch to Night style'}
-          className="w-10 h-10 rounded-full bg-white/85 dark:bg-night/85 backdrop-blur-md text-ink dark:text-white shadow-soft border border-black/5 dark:border-white/10 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all"
+          className="w-11 h-11 rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md text-gray-900 dark:text-white shadow-[3px_3px_0px_#000] border-2 border-black/80 dark:border-white/20 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
         >
-          {isNight ? <Sun className="w-4 h-4 text-marigold" /> : <Moon className="w-4 h-4 text-ink-soft" />}
+          {isNight ? <Sun className="w-4 h-4 text-amber-400 stroke-[2.5]" /> : <Moon className="w-4 h-4 text-gray-700 stroke-[2.5]" />}
         </button>
 
-        <div className="flex flex-col rounded-2xl bg-white/85 dark:bg-night/85 backdrop-blur-md shadow-soft border border-black/5 dark:border-white/10 overflow-hidden">
+        <div className="flex flex-col rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md shadow-[3px_3px_0px_#000] border-2 border-black/80 dark:border-white/20 overflow-hidden">
           <button
             onClick={handleZoomIn}
             aria-label="Zoom in"
-            className="w-10 h-9 flex items-center justify-center text-ink dark:text-white hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all"
+            className="w-11 h-10 flex items-center justify-center text-gray-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 active:bg-amber-400 active:text-black transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 stroke-[3]" />
           </button>
-          <div className="h-px bg-black/5 dark:bg-white/10" />
+          <div className="h-0.5 bg-black/10 dark:bg-white/10" />
           <button
             onClick={handleZoomOut}
             aria-label="Zoom out"
-            className="w-10 h-9 flex items-center justify-center text-ink dark:text-white hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all"
+            className="w-11 h-10 flex items-center justify-center text-gray-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 active:bg-amber-400 active:text-black transition-all cursor-pointer"
           >
-            <Minus className="w-4 h-4" />
+            <Minus className="w-4 h-4 stroke-[3]" />
           </button>
         </div>
       </div>
 
-      {/* Compact Map Attribution */}
-      <div className="absolute bottom-2 left-4 text-[10px] text-ink-muted/80 bg-white/40 dark:bg-night/40 backdrop-blur-xs px-2 py-0.5 rounded pointer-events-none select-none">
-        © MapLibre © CARTO
+      {/* Map Attribution */}
+      <div className="absolute bottom-2 left-4 text-[10px] text-gray-700 dark:text-gray-300 bg-white/85 dark:bg-black/85 backdrop-blur-xs px-2.5 py-1 rounded-md border border-black/10 shadow-xs pointer-events-none select-none">
+        📍 Mumbai Metropolitan Region • © CARTO © OpenStreetMap
       </div>
     </div>
   );

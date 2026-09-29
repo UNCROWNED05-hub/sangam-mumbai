@@ -59,11 +59,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateToSection, onSwitchToA
   return (
     <>
       <header
-        className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-4xl transition-transform duration-300 ${
+        className={`fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-4xl transition-transform duration-300 ${
           isVisible ? 'translate-y-0' : '-translate-y-[150%]'
         }`}
       >
-        <div className="flex items-center justify-between px-4 sm:px-6 py-2.5 rounded-full bg-white/70 dark:bg-night/70 backdrop-blur-md border border-line shadow-soft select-none">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-2.5 rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-2 border-black/80 dark:border-white/20 shadow-[4px_4px_0px_#000] select-none">
           {/* Wordmark with animated pin */}
           <div
             ref={logoRef}
@@ -117,7 +117,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateToSection, onSwitchToA
                 if (onSwitchToApp) onSwitchToApp();
                 else openApp(e.clientX, e.clientY);
               }}
-              className="px-4 py-2 rounded-full bg-marigold hover:bg-marigold-hover text-ink font-bold text-xs shadow-pill active:scale-95 transition-all flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center gap-1.5 cursor-pointer"
               data-cursor="open"
             >
               <span>Open the map</span>

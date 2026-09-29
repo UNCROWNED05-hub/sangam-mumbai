@@ -1,20 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { gsap } from 'gsap';
 
 interface Particle {
+  id: number;
   x: number;
   y: number;
   vx: number;
   vy: number;
   color: string;
-  id: number;
+  size: number;
+  opacity: number;
 }
 
 export const Cursor: React.FC = () => {
   const dotRef = useRef<HTMLDivElement | null>(null);
   const ringRef = useRef<HTMLDivElement | null>(null);
+  const ringInnerRef = useRef<HTMLDivElement | null>(null);
+
+  const [active, setActive] = useState(false);
   const [cursorState, setCursorState] = useState<{
-    type: 'default' | 'link' | 'drag' | 'join' | 'open' | 'pause';
+    type: 'default' | 'link' | 'join' | 'open' | 'drag' | 'fly';
     label: string;
     isPressed: boolean;
   }>({
@@ -25,88 +29,121 @@ export const Cursor: React.FC = () => {
 
   const [particles, setParticles] = useState<Particle[]>([]);
   const particleIdRef = useRef(0);
-  const [active, setActive] = useState(false);
+
+  // Mutable animation state for 60/120fps RAF loop
+  const mousePos = useRef({ x: -100, y: -100 });
+  const ringPos = useRef({ x: -100, y: -100 });
+  const ringVelocity = useRef({ vx: 0, vy: 0 });
+  const lastTimeRef = useRef(0);
+  const lastParticleTimeRef = useRef(0);
+  const rafId = useRef<number | null>(null);
 
   useEffect(() => {
-    // Only mount on fine pointer with hover
     if (typeof window === 'undefined') return;
-    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
 
-    const dot = dotRef.current;
-    const ring = ringRef.current;
-    if (!dot || !ring) return;
+    // Detect if primary device has touch only (no mouse)
+    const isTouchOnly = 'ontouchstart' in window && !window.matchMedia('(any-hover: hover)').matches;
+    if (isTouchOnly) return;
 
-    document.documentElement.classList.add('has-cursor');
-    setActive(true);
+    let activated = false;
 
-    // quickTo setters
-    const setDotX = gsap.quickTo(dot, 'x', { duration: 0.08, ease: 'power2.out' });
-    const setDotY = gsap.quickTo(dot, 'y', { duration: 0.08, ease: 'power2.out' });
-    const setRingX = gsap.quickTo(ring, 'x', { duration: 0.45, ease: 'power3.out' });
-    const setRingY = gsap.quickTo(ring, 'y', { duration: 0.45, ease: 'power3.out' });
-
-    let lastX = 0;
-    let lastY = 0;
-
-    const handlePointerMove = (e: PointerEvent) => {
+    const handlePointerMove = (e: MouseEvent) => {
       const { clientX: x, clientY: y } = e;
-      setDotX(x);
-      setDotY(y);
-      setRingX(x);
-      setRingY(y);
+      mousePos.current.x = x;
+      mousePos.current.y = y;
 
-      // Velocity & angle calculation for velocity stretch
-      const dx = x - lastX;
-      const dy = y - lastY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-
-      if (dist > 3) {
-        const stretch = Math.min(1.35, 1 + dist * 0.015);
-        gsap.to(ring, {
-          rotation: angle,
-          scaleX: stretch,
-          scaleY: 1 / Math.sqrt(stretch),
-          duration: 0.15,
-          overwrite: 'auto',
-        });
-      } else {
-        gsap.to(ring, {
-          scaleX: 1,
-          scaleY: 1,
-          duration: 0.25,
-          overwrite: 'auto',
-        });
+      if (!activated) {
+        activated = true;
+        ringPos.current.x = x;
+        ringPos.current.y = y;
+        document.documentElement.classList.add('has-cursor');
+        setActive(true);
       }
 
-      lastX = x;
-      lastY = y;
+      // Direct placement of sharp center dot (zero latency)
+      if (dotRef.current) {
+        dotRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      }
+
+      // Velocity trail particles
+      const now = performance.now();
+      const dx = x - ringPos.current.x;
+      const dy = y - ringPos.current.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (now - lastParticleTimeRef.current > 50 && dist > 12) {
+        lastParticleTimeRef.current = now;
+        particleIdRef.current += 1;
+        const colors = ['#FFB800', '#FF2D6C', '#00C9A7', '#FFDF00'];
+        const p: Particle = {
+          id: particleIdRef.current,
+          x: x + (Math.random() - 0.5) * 8,
+          y: y + (Math.random() - 0.5) * 8,
+          vx: -dx * 0.08,
+          vy: -dy * 0.08,
+          color: colors[particleIdRef.current % colors.length],
+          size: 4 + Math.random() * 3,
+          opacity: 1,
+        };
+        setParticles((prev) => [...prev.slice(-14), p]);
+      }
     };
 
-    const handlePointerOver = (e: PointerEvent) => {
+    // RAF Loop for smooth physics-based follower ring
+    const updatePhysics = (timestamp: number) => {
+      if (!lastTimeRef.current) lastTimeRef.current = timestamp;
+      const dt = Math.min(32, timestamp - lastTimeRef.current) / 16.666;
+      lastTimeRef.current = timestamp;
+
+      // Spring lerp towards target mouse position
+      const spring = 0.22;
+      const dx = mousePos.current.x - ringPos.current.x;
+      const dy = mousePos.current.y - ringPos.current.y;
+
+      ringPos.current.x += dx * spring * dt;
+      ringPos.current.y += dy * spring * dt;
+
+      ringVelocity.current.vx = dx;
+      ringVelocity.current.vy = dy;
+
+      const speed = Math.hypot(dx, dy);
+      const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+      const stretch = Math.min(1.45, 1 + speed * 0.012);
+      const squash = 1 / Math.sqrt(stretch);
+
+      if (ringRef.current) {
+        ringRef.current.style.transform = `translate3d(${ringPos.current.x}px, ${ringPos.current.y}px, 0)`;
+      }
+
+      if (ringInnerRef.current) {
+        ringInnerRef.current.style.transform = `rotate(${angle}deg) scale(${stretch}, ${squash})`;
+      }
+
+      rafId.current = requestAnimationFrame(updatePhysics);
+    };
+
+    rafId.current = requestAnimationFrame(updatePhysics);
+
+    const handlePointerOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
       const cursorEl = target.closest('[data-cursor]') as HTMLElement | null;
       if (cursorEl) {
-        const type = (cursorEl.getAttribute('data-cursor') || 'default') as
-          | 'default'
-          | 'link'
-          | 'drag'
-          | 'join'
-          | 'open'
-          | 'pause';
+        const type = (cursorEl.getAttribute('data-cursor') || 'default') as any;
         const label =
-          type === 'drag'
-            ? 'drag'
+          type === 'open'
+            ? 'EXPLORE'
             : type === 'join'
-            ? 'join'
-            : type === 'open'
-            ? 'open'
-            : type === 'pause'
-            ? 'pause'
+            ? 'JOIN CIRCLE'
+            : type === 'fly'
+            ? 'FLY TO'
+            : type === 'drag'
+            ? 'DRAG'
             : '';
         setCursorState((s) => ({ ...s, type, label }));
+      } else if (target.closest('.plan-marker-root, .plan-bubble')) {
+        setCursorState((s) => ({ ...s, type: 'join', label: 'EXPLORE' }));
       } else if (target.closest('button, a, [role="button"], input[type="submit"]')) {
         setCursorState((s) => ({ ...s, type: 'link', label: '' }));
       } else {
@@ -122,15 +159,12 @@ export const Cursor: React.FC = () => {
       setCursorState((s) => ({ ...s, isPressed: false }));
     };
 
-    // Click burst particles on interactive elements
+    // Click particle burst
     const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target || !target.closest('button, a, [role="button"], [data-cursor]')) return;
-
-      const colors = ['#FFC21A', '#FF3D7F', '#10B5A5', '#FFFFFF'];
-      const newBurst: Particle[] = Array.from({ length: 8 }, () => {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 2 + Math.random() * 4;
+      const colors = ['#FFB800', '#FF2D6C', '#00C9A7', '#FFF'];
+      const newBurst: Particle[] = Array.from({ length: 9 }, (_, i) => {
+        const angle = (i * (Math.PI * 2)) / 9 + Math.random() * 0.3;
+        const speed = 2.5 + Math.random() * 3.5;
         particleIdRef.current += 1;
         return {
           id: particleIdRef.current,
@@ -138,84 +172,95 @@ export const Cursor: React.FC = () => {
           y: e.clientY,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          color: colors[Math.floor(Math.random() * colors.length)],
+          color: colors[i % colors.length],
+          size: 5,
+          opacity: 1,
         };
       });
 
       setParticles((prev) => [...prev, ...newBurst]);
-
       setTimeout(() => {
         setParticles((prev) => prev.filter((p) => !newBurst.includes(p)));
-      }, 500);
+      }, 550);
     };
 
-    window.addEventListener('pointermove', handlePointerMove, { passive: true });
-    window.addEventListener('pointerover', handlePointerOver, { passive: true });
-    window.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('mousemove', handlePointerMove, { passive: true });
+    window.addEventListener('mouseover', handlePointerOver, { passive: true });
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('mouseup', handlePointerUp);
     window.addEventListener('click', handleClick);
 
     return () => {
+      if (rafId.current) cancelAnimationFrame(rafId.current);
       document.documentElement.classList.remove('has-cursor');
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerover', handlePointerOver);
-      window.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseover', handlePointerOver);
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('mouseup', handlePointerUp);
       window.removeEventListener('click', handleClick);
     };
   }, []);
 
   if (!active) return null;
 
-  // Compute ring styling by cursor type
-  const getRingDimensions = () => {
+  // Custom Ring Appearance per Hover Target
+  const getRingClasses = () => {
     switch (cursorState.type) {
       case 'link':
-        return 'w-14 h-14 bg-marigold/25 border-transparent';
-      case 'drag':
-        return 'w-20 h-20 bg-marigold border-transparent text-ink font-semibold';
+        return 'w-12 h-12 bg-amber-400/25 border-2 border-amber-400 backdrop-blur-[1px] scale-110';
       case 'join':
-        return 'w-24 h-24 bg-marigold border-transparent text-ink font-bold shadow-marigold-glow';
+        return 'w-24 h-24 bg-amber-400 border-2 border-black text-black font-black shadow-[3px_3px_0px_#000] scale-105';
       case 'open':
-        return 'w-20 h-20 bg-ink dark:bg-white text-white dark:text-ink font-bold border-transparent';
-      case 'pause':
-        return 'w-18 h-18 border-2 border-marigold bg-marigold/10 text-white font-bold';
+        return 'w-24 h-24 bg-black text-white dark:bg-white dark:text-black font-black border-2 border-amber-400 shadow-xl';
+      case 'fly':
+        return 'w-20 h-20 bg-teal-500 text-white font-bold border-2 border-white shadow-lg';
+      case 'drag':
+        return 'w-16 h-16 bg-rose-500/80 text-white font-bold border-2 border-white';
       default:
-        return 'w-8 h-8 border border-current bg-transparent';
+        return 'w-9 h-9 border-2 border-amber-400/80 bg-amber-400/10 shadow-[0_0_12px_rgba(255,184,0,0.35)]';
     }
   };
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden select-none">
-      {/* Follower Ring */}
+    <div className="fixed inset-0 pointer-events-none z-[99999] overflow-hidden select-none">
+      {/* Physics Trailing Outer Follower Ring */}
       <div
         ref={ringRef}
-        className={`fixed top-0 left-0 -ml-4 -mt-4 rounded-full flex items-center justify-center transition-[background-color,border-color,width,height] duration-200 text-xs ${getRingDimensions()} ${
-          cursorState.isPressed ? 'scale-85' : 'scale-100'
-        }`}
+        className="fixed top-0 left-0 will-change-transform pointer-events-none"
         style={{
           transform: 'translate3d(-100px, -100px, 0)',
         }}
       >
-        {cursorState.label && (
-          <span className="text-[11px] font-bold tracking-tight uppercase select-none pointer-events-none">
-            {cursorState.label}
-          </span>
-        )}
+        <div
+          ref={ringInnerRef}
+          className={`-ml-1/2 -mt-1/2 rounded-full flex items-center justify-center transition-[background-color,border-color,width,height] duration-200 ${getRingClasses()} ${
+            cursorState.isPressed ? 'scale-75' : ''
+          }`}
+          style={{
+            transformOrigin: 'center center',
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          {cursorState.label && (
+            <span className="text-[10px] font-black tracking-widest uppercase select-none px-2 text-center leading-none">
+              {cursorState.label}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Center 6px Sharp Dot */}
-      {cursorState.type !== 'link' && cursorState.type !== 'join' && cursorState.type !== 'drag' && (
+      {/* Immediate Zero-Latency Center Reticle Dot */}
+      {cursorState.type !== 'join' && cursorState.type !== 'open' && (
         <div
           ref={dotRef}
-          className="fixed top-0 left-0 -ml-[3px] -mt-[3px] w-1.5 h-1.5 rounded-full bg-current shadow-sm"
+          className="fixed top-0 left-0 -ml-[5px] -mt-[5px] w-2.5 h-2.5 rounded-full bg-amber-400 border border-black shadow-[0_0_10px_#FFB800] will-change-transform pointer-events-none"
           style={{
             transform: 'translate3d(-100px, -100px, 0)',
           }}
         />
       )}
 
-      {/* Particle Click Burst */}
+      {/* Trailing Luminous Particle Sparks */}
       {particles.map((p) => (
         <div
           key={p.id}
@@ -223,10 +268,11 @@ export const Cursor: React.FC = () => {
           style={{
             left: p.x,
             top: p.y,
-            width: 4,
-            height: 4,
+            width: p.size,
+            height: p.size,
             backgroundColor: p.color,
-            animationDuration: '500ms',
+            boxShadow: `0 0 8px ${p.color}`,
+            transform: 'translate(-50%, -50%)',
           }}
         />
       ))}

@@ -4,7 +4,7 @@ import { Plan } from '../data/plans';
 import { getPerson } from '../data/people';
 import { Avatar } from '../ui/Avatar';
 import { AvatarStack } from '../ui/AvatarStack';
-import { MapPin, Clock, Sparkles, Plus, Users } from 'lucide-react';
+import { MapPin, Clock, Plus, Users, Flame } from 'lucide-react';
 
 interface PlanListProps {
   plans: Plan[];
@@ -40,67 +40,49 @@ export const PlanList: React.FC<PlanListProps> = ({
       data-lenis-prevent
       className={`flex flex-col h-full overflow-y-auto overscroll-contain pr-1 custom-scrollbar ${className}`}
     >
+      {/* Header Stamp */}
       <div className="flex items-center justify-between pb-3 px-1">
         <div className="flex items-center gap-2">
-          <h3 className="font-display font-bold text-sm text-ink dark:text-white uppercase tracking-wider">
-            Live Nearby
+          <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+          <h3 className="font-display font-black text-sm text-gray-900 dark:text-white uppercase tracking-wider">
+            Mumbai Circles
           </h3>
-          <span className="text-xs font-black px-2 py-0.5 rounded-full bg-marigold/20 text-ink dark:text-marigold">
-            {plans.length}
+          <span className="text-xs font-mono font-black px-2 py-0.5 rounded-md bg-amber-400 text-black border border-black shadow-[1.5px_1.5px_0px_#000]">
+            {plans.length} LIVE
           </span>
         </div>
-        <span className="text-[11px] text-ink-muted">Hover to locate</span>
+        <span className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest">
+          TAP TO ZOOM
+        </span>
       </div>
 
       {plans.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center border-2 border-dashed border-black/10 dark:border-white/10 rounded-2xl bg-white/40 dark:bg-night/40 backdrop-blur-xs">
-          <div className="w-12 h-12 rounded-full bg-marigold/20 flex items-center justify-center text-2xl mb-3">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center border-2 border-dashed border-black/20 dark:border-white/20 rounded-3xl bg-[#FFFDF7]/90 dark:bg-[#0F111A]/90 backdrop-blur-xs">
+          <div className="w-12 h-12 rounded-2xl bg-amber-400 border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center text-2xl mb-3">
             📍
           </div>
-          <h4 className="font-display font-bold text-base text-ink dark:text-white">
-            Nothing here yet
+          <h4 className="font-display font-black text-base text-gray-900 dark:text-white">
+            No circles in this sector
           </h4>
-          <p className="text-xs text-ink-soft dark:text-ink-muted mt-1 max-w-[200px]">
-            Be the first to gather people nearby. It takes 20 seconds.
+          <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 max-w-[200px] font-medium">
+            Be the first to gather people nearby in Mumbai.
           </p>
           <button
             onClick={onOpenComposer}
-            className="mt-4 px-4 py-2 rounded-full bg-marigold text-ink font-bold text-xs shadow-soft hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5"
+            className="mt-4 px-4 py-2.5 rounded-xl bg-amber-400 text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5" />
-            Post first plan
+            <Plus className="w-3.5 h-3.5 stroke-[3]" />
+            <span>Host Mumbai Plan</span>
           </button>
         </div>
       ) : (
-        <div className="space-y-2.5 pb-20">
+        <div className="space-y-3 pb-24">
           <AnimatePresence>
             {plans.map((plan) => {
               const host = getPerson(plan.hostId);
               const spotsLeft = plan.capacity - plan.goingIds.length;
               const isSelected = selectedPlanId === plan.id;
               const isHovered = hoveredPlanId === plan.id;
-
-              // Urgency calculation
-              let urgencyChip: { label: string; bg: string; text: string } | null = null;
-              if (plan.startsInMin <= 15 && plan.startsInMin >= 0) {
-                urgencyChip = {
-                  label: `Starts in ${plan.startsInMin}m`,
-                  bg: 'bg-marigold/20 border-marigold/40',
-                  text: 'text-ink dark:text-marigold',
-                };
-              } else if (spotsLeft === 1) {
-                urgencyChip = {
-                  label: '1 spot left',
-                  bg: 'bg-bougainvillea/15 border-bougainvillea/30',
-                  text: 'text-bougainvillea',
-                };
-              } else if (spotsLeft <= 0) {
-                urgencyChip = {
-                  label: 'Full: waitlist',
-                  bg: 'bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20',
-                  text: 'text-ink-muted',
-                };
-              }
 
               return (
                 <motion.div
@@ -117,76 +99,79 @@ export const PlanList: React.FC<PlanListProps> = ({
                   onMouseEnter={() => onHoverPlan(plan.id)}
                   onMouseLeave={() => onHoverPlan(null)}
                   onClick={() => onSelectPlan(plan.id)}
-                  className={`group relative p-3.5 rounded-2xl cursor-pointer transition-all duration-200 border ${
+                  data-cursor="join"
+                  className={`group relative p-3.5 rounded-2xl cursor-pointer transition-all duration-200 border-2 ${
                     isSelected
-                      ? 'bg-white dark:bg-night border-marigold shadow-soft ring-2 ring-marigold/40 scale-[1.01]'
+                      ? 'bg-amber-100/90 dark:bg-amber-950/40 border-black dark:border-amber-400 shadow-[4px_4px_0px_#000] scale-[1.01]'
                       : isHovered
-                      ? 'bg-white dark:bg-night border-black/15 dark:border-white/20 shadow-md -translate-y-0.5'
-                      : 'bg-white/80 dark:bg-night/70 hover:bg-white dark:hover:bg-night border-black/5 dark:border-white/10 shadow-xs'
+                      ? 'bg-white dark:bg-[#141624] border-black dark:border-white shadow-[4px_4px_0px_#000] -translate-y-0.5'
+                      : 'bg-white/95 dark:bg-[#0F111A]/95 hover:bg-white border-black/80 dark:border-white/20 shadow-[2.5px_2.5px_0px_#000]'
                   } backdrop-blur-md`}
                 >
-                  {/* Top line: Emoji + Title + Urgency */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
-                        {plan.emoji}
-                      </span>
-                      <h4 className="font-display font-bold text-sm text-ink dark:text-white truncate">
+                  {/* Top Bar: Area Badge + Time */}
+                  <div className="flex items-center justify-between gap-1 mb-1.5">
+                    <span className="text-[10px] font-mono font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-black text-white dark:bg-white dark:text-black">
+                      {plan.place.area}
+                    </span>
+
+                    <div className="flex items-center gap-1 text-[11px] font-bold">
+                      {plan.startsInMin <= 0 ? (
+                        <span className="text-rose-600 dark:text-rose-400 flex items-center gap-1 font-mono font-black">
+                          <Flame className="w-3 h-3 fill-current" />
+                          <span>LIVE NOW</span>
+                        </span>
+                      ) : (
+                        <span className="text-gray-600 dark:text-gray-300 font-mono">
+                          IN {plan.startsInMin}M
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Title & Emoji */}
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-2xl flex-shrink-0 group-hover:scale-115 transition-transform duration-200">
+                      {plan.emoji}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-display font-black text-sm text-gray-950 dark:text-white leading-snug line-clamp-2">
                         {plan.title}
                       </h4>
+                      <div className="flex items-center gap-1 mt-1 text-xs text-gray-600 dark:text-gray-300">
+                        <MapPin className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                        <span className="truncate font-medium">{plan.place.name}</span>
+                      </div>
                     </div>
+                  </div>
 
-                    {urgencyChip && (
+                  {/* Vibe Tags */}
+                  <div className="flex flex-wrap gap-1 mt-2.5">
+                    {plan.vibeTags.slice(0, 2).map((tag) => (
                       <span
-                        className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${urgencyChip.bg} ${urgencyChip.text} flex-shrink-0`}
+                        key={tag}
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-gray-700 dark:text-gray-300"
                       >
-                        {urgencyChip.label}
+                        #{tag}
                       </span>
-                    )}
+                    ))}
                   </div>
 
-                  {/* Location & Time info */}
-                  <div className="mt-2 flex items-center gap-3 text-xs text-ink-soft dark:text-ink-muted">
-                    <div className="flex items-center gap-1 truncate max-w-[170px]">
-                      <MapPin className="w-3 h-3 flex-shrink-0 text-lagoon" />
-                      <span className="truncate">{plan.place.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <Clock className="w-3 h-3 text-ink-muted" />
-                      <span>{plan.startsInMin > 0 ? `In ${plan.startsInMin}m` : 'Now'}</span>
-                    </div>
-                  </div>
-
-                  {/* Footer: Host & Avatars */}
-                  <div className="mt-3 pt-2.5 border-t border-black/5 dark:border-white/5 flex items-center justify-between">
+                  {/* Footer: Host & Count */}
+                  <div className="mt-3 pt-2.5 border-t border-black/10 dark:border-white/10 flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <Avatar
-                        person={host}
-                        size="xs"
-                        showVerifiedRing
-                        showOnlineBadge
-                      />
-                      <span className="text-xs font-semibold text-ink-soft dark:text-ink-muted truncate max-w-[90px]">
-                        {host.name.split(' ')[0]}
+                      <Avatar person={host} size="xs" showVerifiedRing />
+                      <span className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate max-w-[100px]">
+                        {host.name}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-1.5">
                       <AvatarStack userIds={plan.goingIds} max={3} size="xs" />
-                      <span className="text-xs font-bold text-ink dark:text-white flex items-center gap-0.5">
-                        <Users className="w-3 h-3 text-ink-muted" />
+                      <span className="text-xs font-black text-black dark:text-white font-mono bg-amber-400 px-2 py-0.5 rounded-md border border-black shadow-[1px_1px_0px_#000]">
                         {plan.goingIds.length}/{plan.capacity}
                       </span>
                     </div>
                   </div>
-
-                  {/* Sponsored tag if applicable */}
-                  {plan.sponsored && (
-                    <div className="mt-1.5 flex items-center gap-1 text-[10px] font-bold text-marigold uppercase tracking-wider">
-                      <Sparkles className="w-3 h-3 text-marigold" />
-                      <span>Featured by {plan.sponsorName || 'Venue'}</span>
-                    </div>
-                  )}
                 </motion.div>
               );
             })}

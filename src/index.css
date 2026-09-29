@@ -86,3 +86,19 @@ h1, h2, h3 {
   z-index: 9990;
   opacity: 0.045;
 }
+
+/* Tactile Neo-Brutalist & Bombay Paper Utilities */
+.tactile-card {
+  border: 2px solid rgba(0, 0, 0, 0.85);
+  box-shadow: 3.5px 3.5px 0px #000;
+}
+.tactile-button {
+  border: 2px solid rgba(0, 0, 0, 0.85);
+  box-shadow: 3px 3px 0px #000;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.tactile-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px #000;
+}
+

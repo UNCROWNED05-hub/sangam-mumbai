@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plan } from '../data/plans';
-import { PEOPLE, getPerson } from '../data/people';
-import { Check, Sparkles } from 'lucide-react';
-import { CURRENT_USER } from '../data/people';
+import { getPerson } from '../data/people';
+import { Check, MapPin } from 'lucide-react';
 
 interface PlanBubbleProps {
   plan: Plan;
@@ -27,24 +26,23 @@ export const PlanBubble: React.FC<PlanBubbleProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const isHappeningNow = plan.startsInMin <= 15 && plan.startsInMin >= -60;
 
-  // Determine state styling per Section 5.2
+  // Neo-brutalist tactile styling
   const getBubbleStyles = () => {
     if (isJoined) {
-      return 'bg-lagoon text-white border-2 border-white shadow-soft';
+      return 'bg-emerald-500 text-white border-2 border-black shadow-[3px_3px_0px_#000]';
     }
     if (isMine) {
-      return 'bg-bougainvillea text-white border-2 border-white shadow-soft';
+      return 'bg-rose-500 text-white border-2 border-black shadow-[3px_3px_0px_#000]';
     }
     if (plan.sponsored) {
-      return 'bg-ink text-white border-2 border-marigold shadow-marigold-glow';
+      return 'bg-black text-amber-400 border-2 border-amber-400 shadow-[3px_3px_0px_#000]';
     }
     if (isHappeningNow) {
-      return 'bg-marigold text-ink border-2 border-white shadow-marigold-glow';
+      return 'bg-amber-400 text-black border-2 border-black shadow-[3px_3px_0px_#000]';
     }
-    return 'bg-white dark:bg-night text-ink dark:text-white border border-line shadow-soft';
+    return 'bg-white text-gray-950 dark:bg-[#121420] dark:text-white border-2 border-black/80 dark:border-white/30 shadow-[3px_3px_0px_#000]';
   };
 
-  const host = getPerson(plan.hostId);
   const goers = plan.goingIds.map((id) => getPerson(id)).slice(0, 3);
 
   return (
@@ -56,21 +54,21 @@ export const PlanBubble: React.FC<PlanBubbleProps> = ({
     >
       {/* Outer Glow Pulse for Happening Now */}
       {isHappeningNow && !isJoined && (
-        <span className="absolute inset-0 rounded-full bg-marigold opacity-40 animate-ping -z-10" />
+        <span className="absolute inset-0 rounded-full bg-amber-400 opacity-60 animate-ping -z-10" />
       )}
 
       {/* Main Pill Bubble */}
       <motion.button
         type="button"
-        whileHover={{ scale: 1.08, y: -4 }}
-        whileTap={{ scale: 0.94 }}
+        whileHover={{ scale: 1.1, y: -4 }}
+        whileTap={{ scale: 0.93 }}
         onClick={onClick}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-xs transition-all ${getBubbleStyles()} ${
-          isSelected ? 'ring-4 ring-marigold ring-offset-2 ring-offset-transparent' : ''
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-black text-xs transition-all cursor-pointer ${getBubbleStyles()} ${
+          isSelected ? 'ring-4 ring-amber-400 ring-offset-2' : ''
         }`}
       >
-        <span className="font-emoji text-sm leading-none">{plan.emoji}</span>
-        <span className="tabular-nums font-mono text-[11px] leading-none">
+        <span className="text-base leading-none">{plan.emoji}</span>
+        <span className="tabular-nums font-mono text-[11px] leading-none font-black">
           {plan.goingIds.length}
         </span>
         {isJoined && <Check className="w-3.5 h-3.5 stroke-[3] ml-0.5" />}
@@ -84,24 +82,33 @@ export const PlanBubble: React.FC<PlanBubbleProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 p-3 rounded-2xl bg-paper dark:bg-night border border-line shadow-ambient z-50 pointer-events-none"
+            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-60 p-3.5 rounded-2xl bg-[#FFFDF7] dark:bg-[#0F111A] border-2 border-black shadow-[5px_5px_0px_#000] z-50 pointer-events-none text-gray-900 dark:text-white"
           >
-            <div className="flex items-center justify-between text-[11px] font-bold text-ink-muted mb-1">
-              <span>{plan.startsInMin <= 0 ? 'Happening now' : `In ${plan.startsInMin}m`}</span>
-              <span className="text-lagoon font-mono">{plan.place.area}</span>
+            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider mb-1">
+              <span className="text-rose-500 font-mono">
+                {plan.startsInMin <= 0 ? '● LIVE NOW' : `IN ${plan.startsInMin}M`}
+              </span>
+              <span className="bg-amber-400 text-black px-2 py-0.5 rounded-md font-mono">
+                {plan.place.area}
+              </span>
             </div>
 
-            <h4 className="text-xs font-bold text-ink dark:text-white leading-snug line-clamp-1">
+            <h4 className="text-xs font-black text-gray-950 dark:text-white leading-snug line-clamp-2">
               {plan.title}
             </h4>
 
+            <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-600 dark:text-gray-300 font-medium">
+              <MapPin className="w-3 h-3 text-amber-500 flex-shrink-0" />
+              <span className="truncate">{plan.place.name}</span>
+            </div>
+
             {/* Avatars Going */}
-            <div className="flex items-center justify-between mt-2 pt-2 border-t border-line text-[11px]">
+            <div className="flex items-center justify-between mt-2 pt-2 border-t-2 border-black/10 dark:border-white/10 text-[11px]">
               <div className="flex -space-x-1.5 overflow-hidden">
                 {goers.map((g) => (
                   <div
                     key={g.id}
-                    className="w-5 h-5 rounded-full border border-white text-[9px] font-bold flex items-center justify-center text-white"
+                    className="w-5 h-5 rounded-full border border-black text-[9px] font-bold flex items-center justify-center text-white"
                     style={{
                       background: `linear-gradient(135deg, ${g.avatarGradient[0]}, ${g.avatarGradient[1]})`,
                     }}
@@ -110,8 +117,8 @@ export const PlanBubble: React.FC<PlanBubbleProps> = ({
                   </div>
                 ))}
               </div>
-              <span className="text-ink-soft text-[10px] font-medium">
-                {plan.goingIds.length} going • {plan.capacity - plan.goingIds.length} spots
+              <span className="text-gray-600 dark:text-gray-400 text-[10px] font-bold">
+                {plan.goingIds.length} going • {plan.capacity - plan.goingIds.length} spots left
               </span>
             </div>
           </motion.div>
