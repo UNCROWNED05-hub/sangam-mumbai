@@ -27,7 +27,15 @@
   - ChatRoom: Group chat per plan, header with pinned location/time strip, message bubbles, emoji reactions picker with counter pills, interactive poll voting with animated percentage bars, typing indicator with bouncing dots, scripted auto-replies (900-2200ms), auto-scroll with new messages pill.
   - Composer: 5-step create plan flow (What's the plan, When, Where with map place mode crosshair, Who can join with capacity stepper, Review & Post). On post: camera flies, pin drops, toast confirms, plan marked as hosted.
   - Keyboard shortcuts: '/' search, 'Esc' close, 'J'/'K' next/prev plan.
-  - Verified production build and live dev server.
+- [Phase 4] App P1 Features:
+  - TimeScrubber: Bottom-center pill with chips Now / Tonight / Tomorrow / Weekend, 36-hour scrubber, formatted time labels, and realtime spring reset.
+  - OnboardingModal: First-visit onboarding sequence with fake radar permission pulse, interactive interest tags, and initials avatar customized palette.
+  - PremiumSheet: Sangam Club sheet with segmented Weekly / Monthly / Yearly selector with sliding thumb (`layoutId`), animated odometer pricing (₹99 / ₹249 / ₹1,499), perk list, and celebratory simulated purchase flow with confetti.
+  - PlansTab: Upcoming / Hosting / Past segmented tabs with animated underline (`layoutId`), count badges, and leave plan actions.
+  - ChatsTab: Joined Circles vs City Lounges (Mumbai Everyone, Bandra Locals, Weekend Hikers, Street Food), unread preview, and deep link into ChatRoom.
+  - TripsTab: Crew trips showcase (Goa Workation, Lonavala Ridge Trail, Kanheri Caves), interactive day-by-day itinerary timeline, and interactive packing checklist with strikethrough animation.
+  - YouTab: Profile presence, stats, Invisible Ghost Mode toggle, Club membership card, referral code with progress tracker, appearance theme selector (Auto/Day/Night), notification preferences, and demo reset.
+  - Clean production build tested (`npm run build`).
 
 ## Decisions
 - Brand placeholder: "Sangam" centralized in `src/config/brand.ts`.

@@ -11,6 +11,13 @@ import { PlanList } from './PlanList';
 import { PlanSheet } from './PlanSheet';
 import { ChatRoom } from './ChatRoom';
 import { Composer } from './Composer';
+import { TimeScrubber } from './TimeScrubber';
+import { OnboardingModal } from './OnboardingModal';
+import { PremiumSheet } from './PremiumSheet';
+import { PlansTab } from './tabs/PlansTab';
+import { ChatsTab } from './tabs/ChatsTab';
+import { TripsTab } from './tabs/TripsTab';
+import { YouTab } from './tabs/YouTab';
 import { Toast } from '../ui/Toast';
 import { CURRENT_USER } from '../data/people';
 import {
@@ -66,6 +73,7 @@ export const AppShell: React.FC = () => {
   const [onlyStartingSoon, setOnlyStartingSoon] = useState(false);
   const [mobileViewMode, setMobileViewMode] = useState<'map' | 'list'>('map');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [premiumSheetOpen, setPremiumSheetOpen] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -415,6 +423,9 @@ export const AppShell: React.FC = () => {
               />
             </div>
 
+            {/* Time Scrubber (Signature UX Feature P1) */}
+            <TimeScrubber className="hidden sm:flex absolute bottom-5 left-1/2 -translate-x-1/2 z-20 w-[90%] max-w-[420px]" />
+
             {/* Mobile Plan List Overlay (When toggled to List mode) */}
             {mobileViewMode === 'list' && (
               <div className="lg:hidden absolute inset-0 top-28 bg-paper dark:bg-night z-20 p-4">
@@ -434,140 +445,30 @@ export const AppShell: React.FC = () => {
           </div>
         )}
 
-        {/* OTHER TABS: Plans, Chats, Trips, You */}
+        {/* PLANS TAB */}
         {activeTab === 'plans' && (
-          <div className="flex-1 overflow-y-auto p-6 sm:p-10 pt-28 max-w-4xl mx-auto w-full space-y-6">
-            <h2 className="font-display font-extrabold text-2xl">My Plans</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {plans
-                .filter(
-                  (p) =>
-                    p.goingIds.includes(CURRENT_USER.id) || p.hostId === CURRENT_USER.id
-                )
-                .map((plan) => (
-                  <div
-                    key={plan.id}
-                    onClick={() => {
-                      selectPlan(plan.id, true);
-                      setActiveTab('map');
-                    }}
-                    className="p-4 rounded-3xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-marigold cursor-pointer transition-all space-y-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{plan.emoji}</span>
-                      <h3 className="font-display font-bold text-base truncate">{plan.title}</h3>
-                    </div>
-                    <p className="text-xs text-ink-muted">{plan.place.name} • {plan.place.area}</p>
-                    <div className="flex items-center justify-between text-xs pt-2">
-                      <span className="font-bold text-lagoon">
-                        {plan.hostId === CURRENT_USER.id ? 'Hosting' : 'Going'}
-                      </span>
-                      <span className="font-medium text-ink-muted">
-                        {plan.goingIds.length} attending
-                      </span>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
+          <PlansTab
+            onSelectPlan={(id) => {
+              selectPlan(id, true);
+              setActiveTab('map');
+            }}
+            onOpenComposer={() => setComposerOpen(true)}
+          />
         )}
 
+        {/* CHATS TAB */}
         {activeTab === 'chats' && (
-          <div className="flex-1 overflow-y-auto p-6 sm:p-10 pt-28 max-w-3xl mx-auto w-full space-y-6">
-            <h2 className="font-display font-extrabold text-2xl">Conversations</h2>
-            <div className="space-y-3">
-              {plans
-                .filter((p) => p.goingIds.includes(CURRENT_USER.id))
-                .map((plan) => (
-                  <div
-                    key={plan.id}
-                    onClick={() => openChatForPlan(plan.id)}
-                    className="p-4 rounded-3xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-lagoon cursor-pointer transition-all flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{plan.emoji}</span>
-                      <div>
-                        <h4 className="font-bold text-sm">{plan.title}</h4>
-                        <p className="text-xs text-ink-muted">Tap to open group chat</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-lagoon px-2 py-1 rounded-full bg-lagoon/10">
-                      Open →
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
+          <ChatsTab onOpenChat={(id) => openChatForPlan(id)} />
         )}
 
+        {/* TRIPS TAB */}
         {activeTab === 'trips' && (
-          <div className="flex-1 overflow-y-auto p-6 sm:p-10 pt-28 max-w-4xl mx-auto w-full space-y-6">
-            <h2 className="font-display font-extrabold text-2xl">Weekend Crew Trips</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { title: 'Monsoon Day Trip to Lonavala', emoji: '⛰️', dates: 'This Saturday', members: 6 },
-                { title: 'Goa Coastal Workation & Surf', emoji: '🏄', dates: 'Next Weekend', members: 8 },
-                { title: 'Kanheri Caves Heritage Trek', emoji: '🥾', dates: 'Sunday 6:30 AM', members: 12 },
-              ].map((trip) => (
-                <div
-                  key={trip.title}
-                  className="p-5 rounded-3xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 space-y-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl">{trip.emoji}</span>
-                    <div>
-                      <h3 className="font-display font-bold text-base">{trip.title}</h3>
-                      <p className="text-xs text-ink-muted">{trip.dates}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-xs pt-2">
-                    <span className="font-bold text-marigold">{trip.members} people packed</span>
-                    <button
-                      onClick={() => alert(`View details for ${trip.title}`)}
-                      className="px-3 py-1.5 rounded-full bg-ink text-white dark:bg-marigold dark:text-ink font-bold"
-                    >
-                      View Itinerary
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <TripsTab onOpenChat={(id) => openChatForPlan(id)} />
         )}
 
+        {/* YOU / PROFILE TAB */}
         {activeTab === 'you' && (
-          <div className="flex-1 overflow-y-auto p-6 sm:p-10 pt-28 max-w-2xl mx-auto w-full space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-marigold to-bougainvillea flex items-center justify-center text-white font-black text-xl shadow-soft">
-                AM
-              </div>
-              <div>
-                <h2 className="font-display font-black text-xl">{CURRENT_USER.name}</h2>
-                <p className="text-xs text-ink-muted">Active in Mumbai • Verified Member</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-3xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-sm">Ghost / Invisible Mode</h4>
-                  <p className="text-xs text-ink-muted">Hide your live presence dot on the map</p>
-                </div>
-                <button
-                  onClick={() => useAppStore.getState().toggleInvisible()}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${
-                    isInvisible ? 'bg-marigold' : 'bg-black/20 dark:bg-white/20'
-                  }`}
-                >
-                  <span
-                    className={`block w-5 h-5 rounded-full bg-white transition-transform ${
-                      isInvisible ? 'translate-x-6' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-          </div>
+          <YouTab onOpenPremium={() => setPremiumSheetOpen(true)} />
         )}
 
         {/* PLAN SHEET / DRAWER (When plan is selected) */}
@@ -605,6 +506,15 @@ export const AppShell: React.FC = () => {
             />
           )}
         </AnimatePresence>
+
+        {/* ONBOARDING MODAL (First visit) */}
+        <OnboardingModal />
+
+        {/* PREMIUM MEMBERSHIP SHEET */}
+        <PremiumSheet
+          isOpen={premiumSheetOpen}
+          onClose={() => setPremiumSheetOpen(false)}
+        />
       </div>
 
       {/* 3. MOBILE BOTTOM NAVIGATION BAR (<1024px) */}
