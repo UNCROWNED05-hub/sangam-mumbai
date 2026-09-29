@@ -14,7 +14,11 @@ import { L7FAQ } from './sections/L7FAQ';
 import { L8EmojiPile } from './sections/L8EmojiPile';
 import { L9Footer } from './sections/L9Footer';
 
-export const Landing: React.FC = () => {
+interface LandingProps {
+  onSwitchToApp?: () => void;
+}
+
+export const Landing: React.FC<LandingProps> = ({ onSwitchToApp }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [preloaderDone, setPreloaderDone] = useState(false);
 
@@ -40,7 +44,7 @@ export const Landing: React.FC = () => {
       <Sky progress={scrollProgress} />
 
       {/* Floating Glass Pill Navigation */}
-      <Navbar />
+      <Navbar onSwitchToApp={onSwitchToApp} />
 
       {/* Desktop Scroll Clock Rail */}
       <ScrollRail progress={scrollProgress} />

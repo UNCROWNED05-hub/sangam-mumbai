@@ -35,7 +35,11 @@ import {
   X,
 } from 'lucide-react';
 
-export const AppShell: React.FC = () => {
+interface AppShellProps {
+  onSwitchToStory?: () => void;
+}
+
+export const AppShell: React.FC<AppShellProps> = ({ onSwitchToStory }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -175,7 +179,7 @@ export const AppShell: React.FC = () => {
         {/* Logo */}
         <div className="flex flex-col items-center gap-1">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => (onSwitchToStory ? onSwitchToStory() : navigate('/'))}
             title="Return to Home Landing"
             className="w-11 h-11 rounded-2xl bg-marigold flex items-center justify-center text-ink font-display font-extrabold text-xl shadow-soft hover:scale-105 active:scale-95 transition-all"
           >

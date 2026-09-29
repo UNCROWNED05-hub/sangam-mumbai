@@ -7,9 +7,10 @@ import { Menu, X, ArrowRight } from 'lucide-react';
 
 interface NavbarProps {
   onNavigateToSection?: (sectionId: string) => void;
+  onSwitchToApp?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onNavigateToSection }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onNavigateToSection, onSwitchToApp }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeLink, setActiveLink] = useState('How it works');
@@ -112,7 +113,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateToSection }) => {
             <button
               ref={ctaRef}
               type="button"
-              onClick={(e) => openApp(e.clientX, e.clientY)}
+              onClick={(e) => {
+                if (onSwitchToApp) onSwitchToApp();
+                else openApp(e.clientX, e.clientY);
+              }}
               className="px-4 py-2 rounded-full bg-marigold hover:bg-marigold-hover text-ink font-bold text-xs shadow-pill active:scale-95 transition-all flex items-center gap-1.5"
               data-cursor="open"
             >
