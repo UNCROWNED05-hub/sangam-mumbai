@@ -1,14 +1,9 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import * as maplibregl from 'maplibre-gl';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import L from 'leaflet';
 import { Plan } from '../data/plans';
 import { CITY } from '../config/city';
 import { useAppStore } from '../store/useAppStore';
-import { PlanBubble } from '../ui/PlanBubble';
-import { MAP_STYLE_DAY, MAP_STYLE_NIGHT, MUMBAI_WAYPOINTS } from '../config/mapStyles';
 import {
-  Compass,
   Moon,
   Sun,
   Plus,
@@ -19,7 +14,6 @@ import {
   MapPin,
   Play,
   Square,
-  Sparkles,
 } from 'lucide-react';
 
 interface MapViewProps {
@@ -33,8 +27,19 @@ interface MapViewProps {
   className?: string;
 }
 
-// User starting location: Bandra West, Mumbai
-const USER_LOCATION: [number, number] = [72.83, 19.059];
+// User starting location: Bandra West, Mumbai [lat, lng]
+const USER_LOCATION: [number, number] = [19.059, 72.83];
+
+// Key Mumbai Landmarks for Navigation and Flight
+const MUMBAI_LANDMARKS = [
+  { name: 'Marine Drive', coords: [18.9433, 72.8236] as [number, number], zoom: 15 },
+  { name: 'Bandra Bandstand', coords: [19.0425, 72.8190] as [number, number], zoom: 15.5 },
+  { name: 'Gateway of India', coords: [18.9226, 72.8340] as [number, number], zoom: 15.5 },
+  { name: 'Worli Sea Face', coords: [19.0100, 72.8165] as [number, number], zoom: 15 },
+  { name: 'Juhu Beach', coords: [19.0985, 72.8266] as [number, number], zoom: 15 },
+  { name: 'Shivaji Park', coords: [19.0270, 72.8380] as [number, number], zoom: 15.5 },
+  { name: 'Kala Ghoda', coords: [18.9289, 72.8318] as [number, number], zoom: 16 },
+];
 
 export const MapView: React.FC<MapViewProps> = ({
   filteredPlans,
@@ -47,227 +52,240 @@ export const MapView: React.FC<MapViewProps> = ({
   className = '',
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const userMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const userMarkerRef = useRef<L.Marker | null>(null);
 
-  const { theme, effectiveTheme, setTheme, isInvisible } = useAppStore();
-  const [currentZoom, setCurrentZoom] = useState(12.6);
-  const [is3D, setIs3D] = useState(true);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const { effectiveTheme, setTheme, isInvisible } = useAppStore();
   const [activeTourIndex, setActiveTourIndex] = useState<number | null>(null);
   const tourTimerRef = useRef<number | null>(null);
 
-  const [markerContainers, setMarkerContainers] = useState<
-    Map<string, { el: HTMLDivElement; marker: maplibregl.Marker }>
-  >(new Map());
-
   const isNight = effectiveTheme === 'dark';
-  const isZoomedOut = currentZoom < 11.5;
 
-  // 1. Initialize Map with Carto Retina Raster specification
+  // 1. Initialize Leaflet Map
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    try {
-      const map = new maplibregl.Map({
-        container: mapContainerRef.current,
-        style: isNight ? MAP_STYLE_NIGHT : MAP_STYLE_DAY,
-        center: USER_LOCATION,
-        zoom: 12.8,
-        pitch: 52,
-        bearing: -14,
-        attributionControl: false,
-        maxPitch: 65,
-      });
+    // Fix default marker icon issues if needed
+    delete (L.Icon.Default.prototype as any)._getIconUrl;
 
-      map.on('load', () => {
-        setIsMapLoaded(true);
-        map.resize();
-      });
+    const map = L.map(mapContainerRef.current, {
+      center: USER_LOCATION,
+      zoom: 13,
+      zoomControl: false,
+      attributionControl: false,
+      scrollWheelZoom: true,
+      fadeAnimation: true,
+    });
 
-      map.on('zoom', () => {
-        setCurrentZoom(map.getZoom());
-      });
+    mapRef.current = map;
 
-      // Handle placeMode drag tracking
-      map.on('move', () => {
-        if (placeMode && onPlaceLocationChange) {
-          const center = map.getCenter();
-          const lngLat: [number, number] = [center.lng, center.lat];
-          // Find nearest anchor
-          let nearest = CITY.anchors[0];
-          let minDist = Infinity;
-          for (const anchor of CITY.anchors) {
-            const dx = anchor.lngLat[0] - lngLat[0];
-            const dy = anchor.lngLat[1] - lngLat[1];
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < minDist) {
-              minDist = dist;
-              nearest = anchor;
-            }
+    // Retina Carto Voyager Tiles (Day) or Dark Matter (Night)
+    const tileUrl = isNight
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+
+    const tileLayer = L.tileLayer(tileUrl, {
+      maxZoom: 19,
+      subdomains: 'abcd',
+    }).addTo(map);
+
+    tileLayerRef.current = tileLayer;
+
+    // Layer group for plan markers
+    const markersLayer = L.layerGroup().addTo(map);
+    markersLayerRef.current = markersLayer;
+
+    // Custom HTML Marker for User Location ("You are here")
+    const userIcon = L.divIcon({
+      className: 'user-location-marker',
+      html: `
+        <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
+          <div style="position: absolute; width: 26px; height: 26px; border-radius: 9999px; background: rgba(16, 185, 129, 0.35); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+          <div style="width: 14px; height: 14px; border-radius: 9999px; background: #10B981; border: 2.5px solid #FFFFFF; box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);"></div>
+        </div>
+      `,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+
+    const userMarker = L.marker(USER_LOCATION, { icon: userIcon, interactive: false }).addTo(map);
+    userMarkerRef.current = userMarker;
+
+    // Invalidate map size after DOM settles
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    window.addEventListener('resize', handleResize);
+
+    // Track map center during placeMode
+    map.on('move', () => {
+      if (placeMode && onPlaceLocationChange) {
+        const center = map.getCenter();
+        const lngLat: [number, number] = [center.lng, center.lat];
+        let nearest = CITY.anchors[0];
+        let minDist = Infinity;
+        for (const anchor of CITY.anchors) {
+          const dx = anchor.lngLat[0] - lngLat[0];
+          const dy = anchor.lngLat[1] - lngLat[1];
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < minDist) {
+            minDist = dist;
+            nearest = anchor;
           }
-          onPlaceLocationChange(lngLat, `Near ${nearest.name}`);
         }
-      });
+        onPlaceLocationChange(lngLat, `Near ${nearest.name}`);
+      }
+    });
 
-      mapRef.current = map;
-
-      // Attach User Location Marker
-      const userEl = document.createElement('div');
-      userEl.className = 'user-radar-marker relative pointer-events-none';
-      const userMarker = new maplibregl.Marker({ element: userEl })
-        .setLngLat(USER_LOCATION)
-        .addTo(map);
-      userMarkerRef.current = userMarker;
-
-      const handleWindowResize = () => {
-        map.resize();
-      };
-      window.addEventListener('resize', handleWindowResize);
-
-      const resizeObserver = new ResizeObserver(() => {
-        map.resize();
-      });
-      resizeObserver.observe(mapContainerRef.current);
-
-      return () => {
-        window.removeEventListener('resize', handleWindowResize);
-        resizeObserver.disconnect();
-        userMarker.remove();
-        map.remove();
-        mapRef.current = null;
-      };
-    } catch (err) {
-      console.error('Failed to init MapLibre:', err);
-    }
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+      map.remove();
+      mapRef.current = null;
+    };
   }, []);
 
-  // 2. Handle Day / Night style changes
+  // 2. Day / Night Tile Swap
   useEffect(() => {
-    if (!mapRef.current || !isMapLoaded) return;
-    const targetStyle = isNight ? MAP_STYLE_NIGHT : MAP_STYLE_DAY;
-    mapRef.current.setStyle(targetStyle);
-  }, [isNight, isMapLoaded]);
+    if (!mapRef.current) return;
+    const tileUrl = isNight
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
-  // 3. Keep Map Markers in Sync with filteredPlans
+    if (tileLayerRef.current) {
+      tileLayerRef.current.setUrl(tileUrl);
+    }
+  }, [isNight]);
+
+  // 3. Render Custom Markers for filteredPlans
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !isMapLoaded || isZoomedOut || placeMode) {
-      // Clear markers if zoomed out or in place mode
-      markerContainers.forEach(({ marker, el }) => {
-        marker.remove();
-        el.remove();
-      });
-      setMarkerContainers(new Map());
+    const markersLayer = markersLayerRef.current;
+    if (!map || !markersLayer || placeMode) {
+      markersLayer?.clearLayers();
       return;
     }
 
-    const nextContainers = new Map(markerContainers);
+    markersLayer.clearLayers();
 
-    // Remove markers not in filteredPlans
-    const currentIds = new Set(filteredPlans.map((p) => p.id));
-    nextContainers.forEach(({ marker, el }, id) => {
-      if (!currentIds.has(id)) {
-        marker.remove();
-        el.remove();
-        nextContainers.delete(id);
-      }
-    });
-
-    // Add new markers
     filteredPlans.forEach((plan) => {
-      if (!nextContainers.has(plan.id)) {
-        const el = document.createElement('div');
-        el.className = 'plan-marker-root cursor-pointer transition-transform duration-200 select-none';
-        const marker = new maplibregl.Marker({
-          element: el,
-          anchor: 'bottom',
-        })
-          .setLngLat(plan.place.lngLat)
-          .addTo(map);
+      const isSelected = selectedPlanId === plan.id;
+      const isHovered = hoveredPlanId === plan.id;
+      const lat = plan.place.lngLat[1];
+      const lng = plan.place.lngLat[0];
 
-        nextContainers.set(plan.id, { el, marker });
-      } else {
-        const existing = nextContainers.get(plan.id);
-        existing?.marker.setLngLat(plan.place.lngLat);
-      }
+      // Styling based on state
+      const bg = isSelected
+        ? '#FFB800'
+        : plan.startsInMin <= 15 && plan.startsInMin >= -60
+        ? '#FFB800'
+        : '#FFFFFF';
+      const textColor = '#000000';
+      const scale = isSelected ? 'scale(1.22)' : isHovered ? 'scale(1.15)' : 'scale(1)';
+      const zIndex = isSelected ? 999 : isHovered ? 998 : 100;
+
+      const markerHtml = `
+        <div 
+          data-plan-id="${plan.id}" 
+          style="
+            display: inline-flex; 
+            align-items: center; 
+            gap: 5px; 
+            padding: 5px 10px; 
+            border-radius: 9999px; 
+            background: ${bg}; 
+            color: ${textColor}; 
+            font-family: inherit; 
+            font-size: 12px; 
+            font-weight: 900; 
+            border: 2px solid #000000; 
+            box-shadow: ${isSelected ? '0 0 12px #FFB800, 4px 4px 0px #000' : '3px 3px 0px #000'}; 
+            cursor: pointer; 
+            transform: ${scale}; 
+            transition: transform 0.15s ease, box-shadow 0.15s ease; 
+            white-space: nowrap; 
+            user-select: none;
+          "
+        >
+          <span style="font-size: 15px; line-height: 1;">${plan.emoji}</span>
+          <span style="font-family: monospace; font-size: 11px; line-height: 1;">${plan.goingIds.length}</span>
+          <span style="font-size: 10px; font-weight: 800; opacity: 0.85; margin-left: 2px;">${plan.place.area.split(' ')[0]}</span>
+        </div>
+      `;
+
+      const icon = L.divIcon({
+        className: `custom-plan-bubble-${plan.id}`,
+        html: markerHtml,
+        iconSize: [80, 32],
+        iconAnchor: [40, 16],
+      });
+
+      const marker = L.marker([lat, lng], { icon, zIndexOffset: zIndex });
+
+      marker.on('click', () => {
+        onSelectPlan(plan.id);
+      });
+
+      marker.on('mouseover', () => {
+        onHoverPlan(plan.id);
+      });
+
+      marker.on('mouseout', () => {
+        onHoverPlan(null);
+      });
+
+      markersLayer.addLayer(marker);
     });
+  }, [filteredPlans, selectedPlanId, hoveredPlanId, placeMode, onSelectPlan, onHoverPlan]);
 
-    setMarkerContainers(nextContainers);
-  }, [filteredPlans, isMapLoaded, isZoomedOut, placeMode]);
-
-  // 4. Camera Glide when Plan Selected
+  // 4. Pan to Plan on Selection
   useEffect(() => {
     if (!mapRef.current || !selectedPlanId) return;
     const targetPlan = filteredPlans.find((p) => p.id === selectedPlanId);
     if (!targetPlan) return;
 
-    const isDesktop = window.innerWidth >= 1024;
-    const padding = isDesktop
-      ? { top: 60, bottom: 60, left: 100, right: 440 }
-      : { top: 80, bottom: window.innerHeight * 0.55, left: 40, right: 40 };
+    const lat = targetPlan.place.lngLat[1];
+    const lng = targetPlan.place.lngLat[0];
 
-    mapRef.current.easeTo({
-      center: targetPlan.place.lngLat,
-      padding,
-      zoom: Math.max(mapRef.current.getZoom(), 13.8),
-      duration: 750,
-      essential: true,
+    mapRef.current.flyTo([lat, lng], 15.5, {
+      animate: true,
+      duration: 1.2,
     });
   }, [selectedPlanId, filteredPlans]);
 
-  // Map Controls
+  // Navigation handlers
   const handleRecenter = useCallback(() => {
     if (!mapRef.current) return;
     stopTour();
-    mapRef.current.flyTo({
-      center: USER_LOCATION,
-      zoom: 13.2,
-      pitch: is3D ? 52 : 0,
-      bearing: -14,
-      duration: 1200,
-    });
-  }, [is3D]);
+    mapRef.current.flyTo(USER_LOCATION, 13.5, { duration: 1.2 });
+  }, []);
 
-  const handleToggle3D = useCallback(() => {
-    if (!mapRef.current) return;
-    const next3D = !is3D;
-    setIs3D(next3D);
-    mapRef.current.easeTo({
-      pitch: next3D ? 52 : 0,
-      duration: 500,
-    });
-  }, [is3D]);
+  const handleZoomIn = useCallback(() => {
+    mapRef.current?.zoomIn();
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    mapRef.current?.zoomOut();
+  }, []);
 
   const handleToggleTheme = useCallback(() => {
     setTheme(isNight ? 'day' : 'night');
   }, [isNight, setTheme]);
 
-  const handleZoomIn = useCallback(() => {
-    if (!mapRef.current) return;
-    mapRef.current.zoomIn({ duration: 300 });
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    if (!mapRef.current) return;
-    mapRef.current.zoomOut({ duration: 300 });
-  }, []);
-
-  // Quick Fly to Mumbai Landmark
-  const handleFlyToLandmark = (lngLat: [number, number], zoom = 14.5, pitch = 55, bearing = -15) => {
+  // Quick Landmark Flight
+  const handleFlyToLandmark = (coords: [number, number], zoom = 15.5) => {
     if (!mapRef.current) return;
     stopTour();
-    mapRef.current.flyTo({
-      center: lngLat,
-      zoom,
-      pitch: is3D ? pitch : 0,
-      bearing,
-      duration: 1400,
-      essential: true,
-    });
+    mapRef.current.flyTo(coords, zoom, { duration: 1.5 });
   };
 
-  // Cinematic Mumbai Autoplay Tour
+  // Cinematic Mumbai Tour Autoplay
   const startTour = () => {
     if (!mapRef.current) return;
     let step = 0;
@@ -275,18 +293,12 @@ export const MapView: React.FC<MapViewProps> = ({
 
     const runStep = () => {
       if (!mapRef.current) return;
-      const wp = MUMBAI_WAYPOINTS[step];
-      mapRef.current.flyTo({
-        center: wp.center,
-        zoom: wp.zoom,
-        pitch: is3D ? wp.pitch : 0,
-        bearing: wp.bearing,
-        duration: 3200,
-      });
+      const target = MUMBAI_LANDMARKS[step];
+      mapRef.current.flyTo(target.coords, target.zoom, { duration: 2.5 });
 
-      step = (step + 1) % MUMBAI_WAYPOINTS.length;
+      step = (step + 1) % MUMBAI_LANDMARKS.length;
       setActiveTourIndex(step);
-      tourTimerRef.current = window.setTimeout(runStep, 4500);
+      tourTimerRef.current = window.setTimeout(runStep, 4200);
     };
 
     runStep();
@@ -300,37 +312,10 @@ export const MapView: React.FC<MapViewProps> = ({
     setActiveTourIndex(null);
   };
 
-  // Compute Area Clusters when zoomed out (<11.5)
-  const areaClusters = useMemo(() => {
-    if (!isZoomedOut) return [];
-    const clusters: { name: string; lngLat: [number, number]; count: number }[] = [];
-
-    CITY.anchors.forEach((anchor) => {
-      const nearCount = filteredPlans.filter((p) => {
-        const dx = p.place.lngLat[0] - anchor.lngLat[0];
-        const dy = p.place.lngLat[1] - anchor.lngLat[1];
-        return Math.sqrt(dx * dx + dy * dy) < 0.035;
-      }).length;
-
-      if (nearCount > 0) {
-        clusters.push({
-          name: anchor.name,
-          lngLat: anchor.lngLat,
-          count: nearCount,
-        });
-      }
-    });
-
-    return clusters;
-  }, [isZoomedOut, filteredPlans]);
-
   return (
     <div className={`relative w-full h-full overflow-hidden bg-[#E8ECEF] ${className}`}>
-      {/* MapLibre Canvas */}
-      <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
-
-      {/* Subtle Map gradient vignette at edges */}
-      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_80px_rgba(20,22,58,0.1)] dark:shadow-[inset_0_0_100px_rgba(0,0,0,0.5)]" />
+      {/* Leaflet DOM Map Container */}
+      <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-0" />
 
       {/* Top Mumbai Landmark Quick-Flight Bar */}
       <div className="absolute top-28 sm:top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-2 border-black/80 dark:border-white/20 shadow-[3px_3px_0px_#000] max-w-[94vw] overflow-x-auto select-none">
@@ -339,20 +324,13 @@ export const MapView: React.FC<MapViewProps> = ({
           <span>MUMBAI:</span>
         </div>
 
-        {[
-          { name: 'Marine Drive', coords: [72.8236, 18.9433] as [number, number] },
-          { name: 'Bandra Bandstand', coords: [72.8190, 19.0425] as [number, number] },
-          { name: 'Gateway of India', coords: [72.8340, 18.9226] as [number, number] },
-          { name: 'Worli Sea Face', coords: [72.8165, 19.0100] as [number, number] },
-          { name: 'Juhu Beach', coords: [72.8266, 19.0985] as [number, number] },
-          { name: 'Shivaji Park', coords: [72.8380, 19.0270] as [number, number] },
-        ].map((loc) => (
+        {MUMBAI_LANDMARKS.map((loc) => (
           <button
             key={loc.name}
             type="button"
-            onClick={() => handleFlyToLandmark(loc.coords)}
+            onClick={() => handleFlyToLandmark(loc.coords, loc.zoom)}
             data-cursor="fly"
-            className="px-2.5 py-1 rounded-xl text-xs font-bold text-gray-900 dark:text-white hover:bg-amber-400 hover:text-black transition-all whitespace-nowrap cursor-pointer"
+            className="px-2.5 py-1 rounded-xl text-xs font-black text-gray-900 dark:text-white hover:bg-amber-400 hover:text-black transition-all whitespace-nowrap cursor-pointer"
           >
             {loc.name}
           </button>
@@ -382,134 +360,30 @@ export const MapView: React.FC<MapViewProps> = ({
         </button>
       </div>
 
-      {/* Render React Portals into Marker Containers */}
-      {!isZoomedOut &&
-        !placeMode &&
-        Array.from(markerContainers.entries()).map(([id, { el }]) => {
-          const plan = filteredPlans.find((p) => p.id === id);
-          if (!plan) return null;
-
-          const isSelected = selectedPlanId === plan.id;
-          const isHovered = hoveredPlanId === plan.id;
-          const isDimmed = selectedPlanId !== null && !isSelected;
-
-          return createPortal(
-            <div
-              key={plan.id}
-              className={`marker-inner transform-gpu transition-all duration-300 ${
-                isDimmed ? 'opacity-40 scale-90' : 'opacity-100'
-              } ${isHovered ? '-translate-y-2 scale-110 z-50' : 'z-20'}`}
-              onMouseEnter={() => onHoverPlan(plan.id)}
-              onMouseLeave={() => onHoverPlan(null)}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectPlan(plan.id);
-              }}
-            >
-              <PlanBubble
-                plan={plan}
-                isSelected={isSelected}
-                enableExpandOnHover={false}
-              />
-            </div>,
-            el
-          );
-        })}
-
-      {/* Zoom-out Area Chips (<11.5) */}
-      <AnimatePresence>
-        {isZoomedOut && !placeMode && (
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            <div className="relative w-full h-full">
-              {areaClusters.map((cluster) => {
-                if (!mapRef.current) return null;
-                const point = mapRef.current.project(cluster.lngLat);
-                return (
-                  <motion.button
-                    key={cluster.name}
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ type: 'spring', damping: 20 }}
-                    onClick={() => handleFlyToLandmark(cluster.lngLat, 13.8)}
-                    className="absolute pointer-events-auto transform -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-2xl bg-black text-white dark:bg-white dark:text-black border-2 border-amber-400 shadow-[3px_3px_0px_#000] hover:scale-105 hover:bg-amber-400 hover:text-black transition-all flex items-center gap-1.5 backdrop-blur-md cursor-pointer"
-                    style={{ left: point.x, top: point.y }}
-                  >
-                    <span className="font-black text-xs">{cluster.name}</span>
-                    <span className="text-[10px] bg-amber-400 text-black px-1.5 py-0.5 rounded-full font-black">
-                      {cluster.count}
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* "You are here" Radar Dot (Portal to userMarker element) */}
-      {userMarkerRef.current &&
-        createPortal(
-          <div className="relative flex items-center justify-center">
-            {isInvisible ? (
-              <div className="relative p-2 rounded-full bg-black/80 dark:bg-white/80 border border-white/40 shadow-soft backdrop-blur-xs flex items-center gap-1.5">
-                <EyeOff className="w-4 h-4 text-amber-400" />
-                <span className="text-[10px] font-bold text-white pr-1">Invisible</span>
-              </div>
-            ) : (
-              <>
-                <span className="absolute w-8 h-8 rounded-full bg-emerald-500/30 animate-ping opacity-75" />
-                <span className="absolute w-6 h-6 rounded-full bg-emerald-500/40 animate-pulse" />
-                <div className="relative w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-md flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                </div>
-              </>
-            )}
-          </div>,
-          userMarkerRef.current.getElement()
-        )}
-
-      {/* Place Mode Crosshair (When Composer Step 3 is active) */}
+      {/* Place Mode Crosshair (When Host composer is active) */}
       {placeMode && (
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-          <motion.div
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="flex flex-col items-center"
-          >
-            <div className="w-12 h-12 rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center animate-spin-slow">
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-30">
+          <div className="flex flex-col items-center">
+            <div className="w-12 h-12 rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center animate-spin">
               <Crosshair className="w-6 h-6 text-amber-400" />
             </div>
             <div className="mt-2 px-3 py-1 bg-black text-white text-xs font-bold rounded-full shadow-lg border-2 border-amber-400 flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-amber-400 animate-bounce" />
               <span>Drag map to place Mumbai pin</span>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
 
-      {/* Floating Controls (Recenter, 2D/3D, Day/Night, Zoom) */}
+      {/* Floating Controls (Recenter, Day/Night, Zoom) */}
       <div className="absolute bottom-6 right-5 flex flex-col gap-2.5 z-30 select-none">
         <button
           onClick={handleRecenter}
           aria-label="Recenter map"
-          title="Recenter to your Mumbai location"
+          title="Recenter to your location"
           className="w-11 h-11 rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md text-gray-900 dark:text-white shadow-[3px_3px_0px_#000] border-2 border-black/80 dark:border-white/20 flex items-center justify-center hover:bg-amber-400 hover:text-black active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
         >
           <Navigation className="w-4 h-4 stroke-[2.5]" />
-        </button>
-
-        <button
-          onClick={handleToggle3D}
-          aria-label="Toggle 3D map pitch"
-          title={is3D ? 'Switch to 2D' : 'Switch to 3D'}
-          className={`w-11 h-11 rounded-2xl backdrop-blur-md shadow-[3px_3px_0px_#000] border-2 border-black/80 dark:border-white/20 flex items-center justify-center active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all cursor-pointer font-black text-xs ${
-            is3D
-              ? 'bg-amber-400 text-black'
-              : 'bg-white/95 dark:bg-[#0F111A]/95 text-gray-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/10'
-          }`}
-        >
-          {is3D ? '3D' : '2D'}
         </button>
 
         <button
@@ -541,7 +415,7 @@ export const MapView: React.FC<MapViewProps> = ({
       </div>
 
       {/* Map Attribution */}
-      <div className="absolute bottom-2 left-4 text-[10px] text-gray-700 dark:text-gray-300 bg-white/85 dark:bg-black/85 backdrop-blur-xs px-2.5 py-1 rounded-md border border-black/10 shadow-xs pointer-events-none select-none">
+      <div className="absolute bottom-2 left-4 text-[10px] text-gray-700 dark:text-gray-300 bg-white/85 dark:bg-black/85 backdrop-blur-xs px-2.5 py-1 rounded-md border border-black/10 shadow-xs pointer-events-none select-none z-10">
         📍 Mumbai Metropolitan Region • © CARTO © OpenStreetMap
       </div>
     </div>

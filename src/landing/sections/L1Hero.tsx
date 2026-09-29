@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import * as maplibregl from 'maplibre-gl';
+import L from 'leaflet';
 import { motion, AnimatePresence } from 'motion/react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -9,8 +9,7 @@ import { useMagnetic } from '../../systems/useMagnetic';
 import { PlanBubble } from '../../ui/PlanBubble';
 import { Odometer } from '../../ui/Odometer';
 import { BRAND } from '../../config/brand';
-import { MAP_STYLE_DAY, MUMBAI_WAYPOINTS, MumbaiWaypoint } from '../../config/mapStyles';
-import { ArrowRight, Smartphone, X, Compass, Navigation2, MapPin } from 'lucide-react';
+import { ArrowRight, Smartphone, X, MapPin } from 'lucide-react';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -18,9 +17,49 @@ interface L1HeroProps {
   onScrollProgress?: (progress: number) => void;
 }
 
+interface MumbaiWp {
+  name: string;
+  tagline: string;
+  coords: [number, number]; // [lat, lng]
+  zoom: number;
+}
+
+const MUMBAI_FLIGHT_WAYPOINTS: MumbaiWp[] = [
+  {
+    name: 'Marine Drive & Chowpatty',
+    tagline: "The Queen's Necklace • Arabian Sea Promenade",
+    coords: [18.9433, 72.8236],
+    zoom: 14.5,
+  },
+  {
+    name: 'Gateway of India & Colaba',
+    tagline: 'Historic Harbor & Regal Yacht Club',
+    coords: [18.9226, 72.8340],
+    zoom: 15,
+  },
+  {
+    name: 'Worli Sea Face & Sea Link',
+    tagline: 'Cable-Stayed Bridge across Mahim Bay',
+    coords: [19.0100, 72.8165],
+    zoom: 14.8,
+  },
+  {
+    name: 'Bandra Bandstand & Mannat',
+    tagline: 'Sunset Rock Promenade & Cafe Hub',
+    coords: [19.0425, 72.8190],
+    zoom: 15.2,
+  },
+  {
+    name: 'Carter Road & Juhu Beach',
+    tagline: 'Joggers, Street Food & Seaside Sunsets',
+    coords: [19.0692, 72.8228],
+    zoom: 15,
+  },
+];
+
 export const L1Hero: React.FC<L1HeroProps> = () => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef = useRef<maplibregl.Map | null>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
   const heroSectionRef = useRef<HTMLDivElement | null>(null);
   const ctaBtnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -28,139 +67,134 @@ export const L1Hero: React.FC<L1HeroProps> = () => {
   const { openApp } = useRouteTransition();
   useMagnetic(ctaBtnRef, { strength: 0.35, radius: 90 });
 
-  const [activeWaypointIndex, setActiveWaypointIndex] = useState(0);
-  const [currentCoords, setCurrentCoords] = useState<[number, number]>(MUMBAI_WAYPOINTS[0].center);
+  const [activeWpIndex, setActiveWpIndex] = useState(0);
+  const [currentCoords, setCurrentCoords] = useState<[number, number]>(MUMBAI_FLIGHT_WAYPOINTS[0].coords);
   const [storeModalOpen, setStoreModalOpen] = useState(false);
 
   // Helper to lerp numbers
   const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-  // Jump or Fly to specific Mumbai Landmark
-  const flyToMumbaiSector = useCallback((idx: number) => {
-    const wp = MUMBAI_WAYPOINTS[idx];
+  // Jump to specific Mumbai Sector
+  const flyToSector = useCallback((idx: number) => {
+    const wp = MUMBAI_FLIGHT_WAYPOINTS[idx];
     if (!wp || !mapInstanceRef.current) return;
-    setActiveWaypointIndex(idx);
-    setCurrentCoords(wp.center);
-    mapInstanceRef.current.flyTo({
-      center: wp.center,
-      zoom: wp.zoom,
-      pitch: wp.pitch,
-      bearing: wp.bearing,
-      duration: 1800,
-      essential: true,
-    });
+    setActiveWpIndex(idx);
+    setCurrentCoords(wp.coords);
+    mapInstanceRef.current.flyTo(wp.coords, wp.zoom, { duration: 1.8 });
   }, []);
 
-  // MapLibre initialization (Retina Carto Raster Day Style, Mumbai Center)
+  // Initialize Leaflet Map
   useEffect(() => {
-    if (!mapContainerRef.current) return;
+    if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    try {
-      const map = new maplibregl.Map({
-        container: mapContainerRef.current,
-        style: MAP_STYLE_DAY,
-        center: MUMBAI_WAYPOINTS[0].center, // Marine Drive
-        zoom: MUMBAI_WAYPOINTS[0].zoom,
-        pitch: MUMBAI_WAYPOINTS[0].pitch,
-        bearing: MUMBAI_WAYPOINTS[0].bearing,
-        interactive: false,
-        attributionControl: false,
+    const map = L.map(mapContainerRef.current, {
+      center: MUMBAI_FLIGHT_WAYPOINTS[0].coords,
+      zoom: MUMBAI_FLIGHT_WAYPOINTS[0].zoom,
+      zoomControl: false,
+      attributionControl: false,
+      scrollWheelZoom: false,
+      dragging: false,
+      touchZoom: false,
+      doubleClickZoom: false,
+      fadeAnimation: true,
+    });
+
+    mapInstanceRef.current = map;
+
+    // Retina Carto Voyager Tiles
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      subdomains: 'abcd',
+    }).addTo(map);
+
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    window.addEventListener('resize', handleResize);
+
+    // ScrollTrigger waypoint flight across Mumbai
+    const heroEl = heroSectionRef.current;
+    if (heroEl) {
+      ScrollTrigger.create({
+        trigger: heroEl,
+        start: 'top top',
+        end: 'bottom bottom',
+        scrub: 0.4,
+        onUpdate: (self) => {
+          const p = self.progress; // 0 to 1
+          const total = MUMBAI_FLIGHT_WAYPOINTS.length - 1;
+          const scaled = p * total;
+          const index = Math.min(Math.floor(scaled), total - 1);
+          const localProgress = scaled - index;
+
+          const w1 = MUMBAI_FLIGHT_WAYPOINTS[index];
+          const w2 = MUMBAI_FLIGHT_WAYPOINTS[index + 1];
+
+          const interpolatedLat = lerp(w1.coords[0], w2.coords[0], localProgress);
+          const interpolatedLng = lerp(w1.coords[1], w2.coords[1], localProgress);
+          const interpolatedZoom = lerp(w1.zoom, w2.zoom, localProgress);
+
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.setView(
+              [interpolatedLat, interpolatedLng],
+              interpolatedZoom,
+              { animate: false }
+            );
+          }
+
+          const currentIdx = Math.round(scaled);
+          setActiveWpIndex(currentIdx);
+          setCurrentCoords([
+            parseFloat(interpolatedLat.toFixed(4)),
+            parseFloat(interpolatedLng.toFixed(4)),
+          ]);
+        },
       });
-
-      mapInstanceRef.current = map;
-
-      map.on('load', () => {
-        map.resize();
-      });
-
-      const handleResize = () => {
-        map.resize();
-      };
-      window.addEventListener('resize', handleResize);
-
-      // ScrollTrigger waypoint flight across Mumbai
-      const heroEl = heroSectionRef.current;
-      if (heroEl) {
-        ScrollTrigger.create({
-          trigger: heroEl,
-          start: 'top top',
-          end: 'bottom bottom',
-          scrub: 0.5,
-          onUpdate: (self) => {
-            const p = self.progress; // 0 to 1
-            const total = MUMBAI_WAYPOINTS.length - 1;
-            const scaled = p * total;
-            const index = Math.min(Math.floor(scaled), total - 1);
-            const localProgress = scaled - index;
-
-            const w1 = MUMBAI_WAYPOINTS[index];
-            const w2 = MUMBAI_WAYPOINTS[index + 1];
-
-            const interpolatedLng = lerp(w1.center[0], w2.center[0], localProgress);
-            const interpolatedLat = lerp(w1.center[1], w2.center[1], localProgress);
-            const interpolatedZoom = lerp(w1.zoom, w2.zoom, localProgress);
-            const interpolatedPitch = lerp(w1.pitch, w2.pitch, localProgress);
-            const interpolatedBearing = lerp(w1.bearing, w2.bearing, localProgress);
-
-            if (mapInstanceRef.current) {
-              mapInstanceRef.current.jumpTo({
-                center: [interpolatedLng, interpolatedLat],
-                zoom: interpolatedZoom,
-                pitch: interpolatedPitch,
-                bearing: interpolatedBearing,
-              });
-            }
-
-            const currentIdx = Math.round(scaled);
-            setActiveWaypointIndex(currentIdx);
-            setCurrentCoords([
-              parseFloat(interpolatedLng.toFixed(4)),
-              parseFloat(interpolatedLat.toFixed(4)),
-            ]);
-          },
-        });
-      }
-
-      return () => {
-        window.removeEventListener('resize', handleResize);
-        map.remove();
-      };
-    } catch (err) {
-      console.warn('Map initialization note:', err);
     }
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+      map.remove();
+      mapInstanceRef.current = null;
+    };
   }, []);
 
-  // 10 Hero Plan Bubbles placed over Mumbai hotspots
+  // 10 Hero Plan Bubbles
   const heroPlans = plans.slice(0, 10);
   const bubblePositions = [
-    { top: '22%', left: '18%' },
-    { top: '28%', left: '62%' },
-    { top: '16%', left: '78%' },
-    { top: '38%', left: '32%' },
-    { top: '44%', left: '76%' },
-    { top: '54%', left: '16%' },
-    { top: '62%', left: '48%' },
-    { top: '68%', left: '82%' },
-    { top: '32%', left: '88%' },
+    { top: '24%', left: '16%' },
+    { top: '28%', left: '60%' },
+    { top: '18%', left: '76%' },
+    { top: '38%', left: '30%' },
+    { top: '44%', left: '74%' },
+    { top: '56%', left: '16%' },
+    { top: '62%', left: '46%' },
+    { top: '68%', left: '80%' },
+    { top: '32%', left: '86%' },
     { top: '74%', left: '26%' },
   ];
 
-  const currentWp = MUMBAI_WAYPOINTS[activeWaypointIndex] || MUMBAI_WAYPOINTS[0];
+  const currentWp = MUMBAI_FLIGHT_WAYPOINTS[activeWpIndex] || MUMBAI_FLIGHT_WAYPOINTS[0];
 
   return (
     <section
       ref={heroSectionRef}
       className="relative min-h-[220vh] w-full flex flex-col justify-between"
     >
-      {/* Pinned / Sticky Map Viewport (Z-0 so it is 100% visible and vivid) */}
+      {/* Pinned Sticky Map Viewport */}
       <div className="sticky top-0 left-0 w-full h-screen overflow-hidden z-0 bg-[#E8ECEF]">
         <div ref={mapContainerRef} className="w-full h-full" />
 
         {/* Ambient Map Vignette Edge Shading */}
-        <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_90px_rgba(15,17,26,0.2)]" />
+        <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_90px_rgba(15,17,26,0.18)]" />
 
         {/* Floating Plan Bubbles on Mumbai Canvas */}
-        <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 pointer-events-none z-10">
           {heroPlans.map((plan, idx) => {
             const pos = bubblePositions[idx % bubblePositions.length];
             return (
@@ -173,8 +207,8 @@ export const L1Hero: React.FC<L1HeroProps> = () => {
                   y: [0, -7, 0],
                 }}
                 transition={{
-                  scale: { delay: 0.8 + idx * 0.05, duration: 0.5, ease: [0.175, 0.885, 0.32, 1.275] },
-                  opacity: { delay: 0.8 + idx * 0.05, duration: 0.3 },
+                  scale: { delay: 0.6 + idx * 0.05, duration: 0.5, ease: [0.175, 0.885, 0.32, 1.275] },
+                  opacity: { delay: 0.6 + idx * 0.05, duration: 0.3 },
                   y: { repeat: Infinity, duration: 3.5 + (idx % 3), ease: 'easeInOut', delay: idx * 0.25 },
                 }}
                 className="absolute pointer-events-auto"
@@ -195,13 +229,13 @@ export const L1Hero: React.FC<L1HeroProps> = () => {
           })}
         </div>
 
-        {/* Live Mumbai Flight Telemetry HUD Bar (Top Center / Right) */}
+        {/* Live Mumbai Flight Telemetry HUD Bar */}
         <div className="absolute top-20 right-6 sm:right-10 pointer-events-auto z-20 flex flex-col items-end gap-2">
           {/* Active Sector Card */}
-          <div className="p-3 sm:p-4 rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-2 border-black/80 dark:border-white/20 shadow-[4px_4px_0px_#000] text-right space-y-1">
+          <div className="p-3 sm:p-4 rounded-2xl bg-white/95 dark:bg-[#0F111A]/95 backdrop-blur-md border-2 border-black/80 dark:border-white/20 shadow-[4px_4px_0px_#000] text-right space-y-1 select-none">
             <div className="flex items-center justify-end gap-2 text-[10px] font-black tracking-widest uppercase text-amber-500 font-mono">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>LIVE MUMBAI CAMERA</span>
+              <span>MUMBAI SCROLL FLIGHT</span>
             </div>
             <p className="font-display font-black text-sm sm:text-base text-gray-950 dark:text-white leading-tight">
               {currentWp.name}
@@ -210,22 +244,22 @@ export const L1Hero: React.FC<L1HeroProps> = () => {
               {currentWp.tagline}
             </p>
             <div className="flex items-center justify-end gap-3 pt-1 text-[10px] font-mono text-gray-500 dark:text-gray-400">
-              <span>{currentCoords[1]}° N</span>
-              <span>{currentCoords[0]}° E</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">● SCROLL TO FLY</span>
+              <span>{currentCoords[0]}° N</span>
+              <span>{currentCoords[1]}° E</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-black">● SCROLL TO FLY</span>
             </div>
           </div>
 
           {/* Quick Landmark Jump Pills */}
           <div className="hidden md:flex items-center gap-1.5 p-1 rounded-xl bg-white/90 dark:bg-[#0F111A]/90 backdrop-blur-md border border-black/20 shadow-[2px_2px_0px_#000]">
-            {MUMBAI_WAYPOINTS.map((wp, idx) => (
+            {MUMBAI_FLIGHT_WAYPOINTS.map((wp, idx) => (
               <button
                 key={wp.name}
                 type="button"
-                onClick={() => flyToMumbaiSector(idx)}
+                onClick={() => flyToSector(idx)}
                 data-cursor="fly"
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
-                  activeWaypointIndex === idx
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                  activeWpIndex === idx
                     ? 'bg-amber-400 text-black shadow-xs font-black'
                     : 'text-gray-700 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'
                 }`}
@@ -237,7 +271,7 @@ export const L1Hero: React.FC<L1HeroProps> = () => {
         </div>
 
         {/* Map Attribution */}
-        <div className="absolute bottom-3 right-4 text-[10px] text-gray-700 dark:text-gray-300 bg-white/80 dark:bg-black/80 backdrop-blur-xs px-2.5 py-1 rounded-md border border-black/10 shadow-xs pointer-events-none">
+        <div className="absolute bottom-3 right-4 text-[10px] text-gray-700 dark:text-gray-300 bg-white/85 dark:bg-black/85 backdrop-blur-xs px-2.5 py-1 rounded-md border border-black/10 shadow-xs pointer-events-none z-10">
           📍 Mumbai Metropolitan Region • © CARTO © OpenStreetMap
         </div>
       </div>
